@@ -1,0 +1,19 @@
+{
+    "name": "gallna/amqp-event",
+    "require": {
+        "symfony/event-dispatcher": "~2.6",
+        "jane/open-api": "^1.2"
+    },
+    "authors": [
+        {
+            "name": "Tomasz Jonik",
+            "email": "tom.jonik@hotmail.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "App\\": "app",
+            "Kemer\\Amqp\\": "src/Kemer/Amqp"
+        }
+    }
+}
