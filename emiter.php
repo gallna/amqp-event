@@ -2,12 +2,12 @@
 include __DIR__.'/vendor/autoload.php';
 
 use Kemer\Amqp;
-use Kemer\Amqp\Server\PhpAmqp;
-use Kemer\Amqp\Server\RabbitMQ;
+use Kemer\Amqp\Broker\PhpAmqp;
+use Kemer\Amqp\Broker\RabbitMQ;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\EventDispatcher\Event;
 
-$broker = new PhpAmqp('server.rabbitmq.development.weeb.online', 5672, 'guest', 'guest');
+$broker = new PhpAmqp('localhost', 5672, 'guest', 'guest');
 $eventDispatcher = new Amqp\Dispatcher($broker);
 
 // Publish some message

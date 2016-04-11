@@ -85,10 +85,10 @@ class PhpAmqp
                 );
             }
             $this->connection = new \AMQPConnection();
-            $this->connection->setHost('server.rabbitmq.development.weeb.online');
+            $this->connection->setHost($this->host);
             $this->connection->setPort($this->port);
-            $this->connection->setLogin('guest');
-            $this->connection->setPassword('guest');
+            $this->connection->setLogin($this->user);
+            $this->connection->setPassword($this->password);
             $this->connection->connect();
         }
         return $this->connection;

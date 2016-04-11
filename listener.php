@@ -2,8 +2,8 @@
 include __DIR__.'/vendor/autoload.php';
 
 use Kemer\Amqp;
-use Kemer\Amqp\Server\RabbitMQ;
-use Kemer\Amqp\Server\PhpAmqp;
+use Kemer\Amqp\Broker\RabbitMQ;
+use Kemer\Amqp\Broker\PhpAmqp;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use App\OnlineFeedListener;
@@ -13,7 +13,7 @@ $eventDispatcher = new EventDispatcher();
 
 // create Amqp server
 $amqp = new Amqp\Amqp(
-    new PhpAmqp('server.rabbitmq.development.weeb.online', 5672, 'guest', 'guest'),
+    new PhpAmqp('localhost', 5672, 'guest', 'guest'),
     $eventDispatcher
 );
 

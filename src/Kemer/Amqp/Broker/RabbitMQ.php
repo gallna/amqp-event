@@ -79,10 +79,10 @@ class RabbitMQ
                 );
             }
             $this->connection = new AMQPStreamConnection(
-                'server.rabbitmq.development.weeb.online',
-                5672,
-                'guest',
-                'guest'
+                $this->host,
+                $this->port,
+                $this->user,
+                $this->password
             );
         }
         return $this->connection;
