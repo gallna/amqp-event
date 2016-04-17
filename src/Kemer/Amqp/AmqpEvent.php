@@ -28,16 +28,10 @@ class AmqpEvent extends Event
     public $envelope;
 
     /**
-     * @var string
+     * @param object $envelope
      */
-    public $message;
-
-    /**
-     * @param string $message
-     */
-    public function __construct(string $message, \AMQPEnvelope $envelope = null)
+    public function __construct($envelope)
     {
-        $this->message = $message;
         $this->envelope = $envelope;
     }
 
@@ -46,9 +40,20 @@ class AmqpEvent extends Event
      *
      * @return string
      */
-    public function getMessage()
+    public function getParsedBody()
     {
-        return $this->message;
+        switch ($contenttype = $this->getContentType()) {
+            case 'text/xml':
+            case 'application/xml':
+                $backup = libxml_disable_entity_loader(true);
+                $result = simplexml_load_string($this->envelope->getBody());
+                libxml_disable_entity_loader($backup);
+                return $result;
+            case 'application/json' :
+                return json_decode($this->envelope->getBody(), true);
+            default:
+                return null;
+        }
     }
 
     /**

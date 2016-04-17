@@ -21,10 +21,11 @@ class Amqp
      *
      * @param EventDispatcher $eventDispatcher
      */
-    public function __construct($broker, EventDispatcher $eventDispatcher)
+    public function __construct($broker, EventDispatcher $eventDispatcher = null)
     {
-        $this->eventDispatcher = $eventDispatcher;
         $this->broker = $broker;
+        $this->eventDispatcher = $eventDispatcher ?: new Dispatcher();
+        $this->eventDispatcher->addListener("#", [$this, "onDispatch"]);
     }
 
     /**
@@ -48,17 +49,17 @@ class Amqp
     }
 
     /**
-     * Run the Amqp event
+     * Run the Amqp listener
      *
      * @return void
      */
-    public function run()
+    public function listen(array $events = [])
     {
-        $events = array_map(
+        array_map(
             [$this->getBroker(), "subscribe"],
-            array_keys($this->getEventDispatcher()->getListeners())
+            $events ?: array_keys($this->getEventDispatcher()->getListeners())
         );
-        $this->getBroker()->run([$this, 'onMessage']);
+        $this->getBroker()->queue()->consume([$this, 'onMessage']);
     }
 
     /**
@@ -67,26 +68,25 @@ class Amqp
      * @param string $message
      * @return void
      */
-    public function onMessage(AmqpEvent $event)
+    public function onMessage(\AMQPEnvelope $envelope)
     {
-        $dispatcher = $this->getEventDispatcher();
-        $events = array_map( function ($listener) use ($dispatcher, $event) {
-            $pattern = str_replace("*", "([\w*]+)", $listener);
-            if ($listener == $event->getName() || preg_match("~$pattern~", $event->getName())) {
-                $dispatcher->dispatch($listener, $event);
-            }
-        }, array_keys($this->getEventDispatcher()->getListeners()));
-        $dispatcher->dispatch("#", $event);
+        $this->getEventDispatcher()->dispatch(
+            $envelope->getRoutingKey(),
+            new ConsumeEvent($envelope)
+        );
     }
 
     /**
      * Send response for current message
      *
-     * @param SsdpEvent $event
+     * @param Event $event
+     * @param string $eventName
      * @return void
      */
-    public function publish($channel, $message)
+    public function onDispatch(Event $event, $eventName)
     {
-        $this->getBroker()->publish($channel, $message);
+        if ($event instanceof PublishEvent) {
+            $this->getBroker()->publish($eventName, $event);
+        }
     }
 }

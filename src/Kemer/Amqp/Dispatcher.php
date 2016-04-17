@@ -2,34 +2,24 @@
 namespace Kemer\Amqp;
 
 use Symfony\Component\EventDispatcher\EventDispatcher;
-use Symfony\Component\EventDispatcher\Event;
 
 class Dispatcher extends EventDispatcher
 {
     /**
-     * @var broker
-     */
-    protected $broker;
-
-    /**
-     * Constructor
-     *
-     * @param EventDispatcher $eventDispatcher
-     */
-    public function __construct($broker)
-    {
-        $this->broker = $broker;
-
-    }
-
-    /**
      * {@inheritdoc}
      */
-    public function dispatch($eventName, Event $event = null)
+    public function getListeners($eventName = null)
     {
-        parent::dispatch($eventName, $event);
-        if ($event instanceof AmqpEvent) {
-            $this->broker->publish($eventName, $event->getMessage());
+        if ($eventName === null) {
+            return parent::getListeners($eventName);
         }
+        $listeners = [];
+        foreach (parent::getListeners() as $name => $eventListeners) {
+            $namePattern = str_replace(["*", "#"], ["(\w+)", "([\w\.]+)"], $name);
+            if (preg_match("~^$namePattern$~", $eventName)) {
+                $listeners = array_merge($listeners, $eventListeners);
+            }
+        }
+        return $listeners;
     }
 }

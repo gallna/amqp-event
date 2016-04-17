@@ -3,7 +3,7 @@ namespace Kemer\Amqp\Broker;
 
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
-use Kemer\Amqp\AmqpEvent;
+use Kemer\Amqp;
 
 class PhpAmqp
 {
@@ -120,7 +120,7 @@ class PhpAmqp
             $this->exchange = new \AMQPExchange($this->channel());
             $this->exchange->setType($this->exchangeType);
             $this->exchange->setName($this->exchangeName);
-            $this->exchange->declare();
+            $this->exchange->declareExchange();
         }
         return $this->exchange;
     }
@@ -129,28 +129,52 @@ class PhpAmqp
     /**
      * Returns channel
      *
+     * @param integer $flags A bitmask of flags:
+     *                       AMQP_DURABLE, AMQP_PASSIVE,
+     *                       AMQP_EXCLUSIVE, AMQP_AUTODELETE.
      * @return object
      */
-    public function queue()
+    public function queue($flags = AMQP_AUTODELETE)
     {
         if (!$this->queue) {
             $this->queue = new \AMQPQueue($this->channel());
-            $this->queue->setFlags(AMQP_EXCLUSIVE);
-            $this->queue->declare();
+            $this->queue->setFlags($flags);
+            $this->queue->declareQueue();
         }
         return $this->queue;
     }
 
     /**
-     * Publish data to channel
+     * Publish a message to an exchange.
      *
-     * @param string $channel
-     * @param array $message
-     * @return array
+     * Publish a message to the exchange represented by the AMQPExchange object.
+     *
+     * @param string  $message     The message to publish.
+     * @param string  $routing_key The optional routing key to which to publish to.
+     * @param integer $flags       One or more of AMQP_MANDATORY and AMQP_IMMEDIATE.
+     * @param array   $attributes  One of content_type, content_encoding,
+     *                             message_id, user_id, app_id, delivery_mode,
+     *                             priority, timestamp, expiration, type
+     *                             or reply_to, headers.
+     *
+     * @throws AMQPExchangeException   On failure.
+     * @throws AMQPChannelException    If the channel is not open.
+     * @throws AMQPConnectionException If the connection to the broker was lost.
+     *
+     * @return boolean TRUE on success or FALSE on failure.
+     *
      */
-    public function publish($channel, $message)
+    public function publish($routingKey, Amqp\AmqpEvent $event)
     {
-        $this->exchange()->publish($message, $channel);
+        $attributes = [
+            "content_type" => $event->getContentType(),
+        ];
+        $this->exchange()->publish(
+            $event->getBody(),
+            $routingKey,
+            AMQP_MANDATORY,
+            $attributes
+        );
     }
 
     /**
@@ -171,21 +195,7 @@ class PhpAmqp
      */
     public function run($callback)
     {
-        $this->callback = $callback;
-        $this->queue->consume([$this, "onMessage"]);
-    }
-
-    /**
-     * Create and dispatch SSDP message
-     *
-     * @param string $message
-     * @return void
-     */
-    public function onMessage($message)
-    {
-        $event = new AmqpEvent($message->getBody(), $message);
-        $event->setName($message->getRoutingKey());
-        call_user_func($this->callback, $event);
+        $this->queue()->consume($callback);
     }
 
     /**
