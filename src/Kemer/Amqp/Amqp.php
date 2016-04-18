@@ -72,7 +72,10 @@ class Amqp
     {
         $this->getEventDispatcher()->dispatch(
             $envelope->getRoutingKey(),
-            new ConsumeEvent($envelope)
+            new ConsumeEvent(
+                $envelope,
+                $this->getBroker()->queue()
+            )
         );
     }
 
