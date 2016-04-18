@@ -128,6 +128,10 @@ class PhpAmqp
 
     /**
      * Returns channel
+     * AMQP_AUTODELETE queue is deleted when last consumer unsubscribes
+     * AMQP_DURABLE the queue will survive a broker restart
+     * AMQP_EXCLUSIVE used by only one connection and the queue will be deleted
+     *  when that connection closes
      *
      * @param integer $flags A bitmask of flags:
      *                       AMQP_DURABLE, AMQP_PASSIVE,
