@@ -52,6 +52,7 @@ class PhpAmqp
      * @var AMQPQueue
      */
     private $queue;
+    private $queueName = null;
 
 
     /**
@@ -111,15 +112,17 @@ class PhpAmqp
     /**
      * Returns exchange
      * Exchange types: direct, topic, headers and fanout.
+     * AMQP_DURABLE AMQP_PASSIVE
      *
      * @return object
      */
-    public function exchange()
+    public function exchange($flags = null)
     {
         if (!$this->exchange) {
             $this->exchange = new \AMQPExchange($this->channel());
             $this->exchange->setType($this->exchangeType);
             $this->exchange->setName($this->exchangeName);
+            $flags and $this->exchange->setFlags($flags);
             $this->exchange->declareExchange();
         }
         return $this->exchange;
@@ -143,6 +146,7 @@ class PhpAmqp
         if (!$this->queue) {
             $this->queue = new \AMQPQueue($this->channel());
             $this->queue->setFlags($flags);
+            $this->queueName and $this->queue->setName($this->queueName);
             $this->queue->declareQueue();
         }
         return $this->queue;
@@ -186,9 +190,9 @@ class PhpAmqp
      *
      * @param string $channel
      */
-    public function subscribe($topic)
+    public function subscribe($routingKey)
     {
-        $this->queue()->bind($this->exchangeName, $topic);
+        $this->queue()->bind($this->exchange()->getName(), $routingKey);
     }
 
 

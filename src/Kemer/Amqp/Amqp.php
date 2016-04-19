@@ -53,13 +53,14 @@ class Amqp
      *
      * @return void
      */
-    public function listen(array $events = [])
+    public function listen(array $events = [], $noack = false)
     {
         array_map(
             [$this->getBroker(), "subscribe"],
             $events ?: array_keys($this->getEventDispatcher()->getListeners())
         );
-        $this->getBroker()->queue()->consume([$this, 'onMessage']);
+        $this->getBroker()->queue()
+            ->consume([$this, 'onMessage'], $noack ? AMQP_NOACK : AMQP_NOPARAM);
     }
 
     /**
