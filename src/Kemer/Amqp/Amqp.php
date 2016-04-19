@@ -17,13 +17,19 @@ class Amqp
     protected $broker;
 
     /**
+     * @var string
+     */
+    protected $exchangeName;
+
+    /**
      * Constructor
      *
      * @param EventDispatcher $eventDispatcher
      */
-    public function __construct($broker, EventDispatcher $eventDispatcher = null)
+    public function __construct($broker, $exchangeName, EventDispatcher $eventDispatcher = null)
     {
         $this->broker = $broker;
+        $this->exchangeName = $exchangeName;
         $this->eventDispatcher = $eventDispatcher ?: new Dispatcher();
         $this->eventDispatcher->addListener("#", [$this, "onDispatch"]);
     }
@@ -48,6 +54,23 @@ class Amqp
         return $this->broker;
     }
 
+
+    /**
+     * On dispatch event listener - called on any event
+     *
+     * @param Event $event
+     * @param string $eventName
+     * @return void
+     */
+    public function onDispatch(Event $event, $eventName)
+    {
+        if ($event instanceof PublishEvent) {
+            $event->envelope->setRoutingKey($eventName);
+            $event->envelope->setExchangeName($this->exchangeName);
+            $this->getBroker()->publish($event);
+        }
+    }
+
     /**
      * Run the Amqp listener
      *
@@ -55,12 +78,15 @@ class Amqp
      */
     public function listen(array $events = [], $noack = false)
     {
-        array_map(
-            [$this->getBroker(), "subscribe"],
-            $events ?: array_keys($this->getEventDispatcher()->getListeners())
-        );
+        $events = $events ?: array_keys($this->getEventDispatcher()->getListeners());
+        foreach ($events as $eventName) {
+            $this->getBroker()->subscribe($this->exchangeName, $eventName);
+        }
         $this->getBroker()->queue()
-            ->consume([$this, 'onMessage'], $noack ? AMQP_NOACK : AMQP_NOPARAM);
+            ->consume(
+                [$this, 'onMessage'],
+                $noack ? AMQP_NOACK : AMQP_NOPARAM
+            );
     }
 
     /**
@@ -78,19 +104,5 @@ class Amqp
                 $this->getBroker()->queue()
             )
         );
-    }
-
-    /**
-     * Send response for current message
-     *
-     * @param Event $event
-     * @param string $eventName
-     * @return void
-     */
-    public function onDispatch(Event $event, $eventName)
-    {
-        if ($event instanceof PublishEvent) {
-            $this->getBroker()->publish($eventName, $event);
-        }
     }
 }

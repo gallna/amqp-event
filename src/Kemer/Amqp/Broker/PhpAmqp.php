@@ -41,12 +41,7 @@ class PhpAmqp
      * @var object
      */
     private $exchange;
-    private $exchangeName = "exchange_name";
     private $exchangeType = AMQP_EX_TYPE_TOPIC;
-    /**
-     * @var callable
-     */
-    private $callback;
 
     /**
      * @var AMQPQueue
@@ -74,7 +69,7 @@ class PhpAmqp
      *
      * @return AMQPStreamConnection
      */
-    public function connection()
+    public function connection($vhost = null)
     {
         if (!$this->connection) {
             if (!$this->host || !$this->port) {
@@ -90,6 +85,7 @@ class PhpAmqp
             $this->connection->setPort($this->port);
             $this->connection->setLogin($this->user);
             $this->connection->setPassword($this->password);
+            $vhost and $this->connection->setVhost($vhost);
             $this->connection->connect();
         }
         return $this->connection;
@@ -116,15 +112,13 @@ class PhpAmqp
      *
      * @return object
      */
-    public function exchange($flags = null)
+    public function exchange($exchangeName, $flags = null)
     {
-        if (!$this->exchange) {
-            $this->exchange = new \AMQPExchange($this->channel());
-            $this->exchange->setType($this->exchangeType);
-            $this->exchange->setName($this->exchangeName);
-            $flags and $this->exchange->setFlags($flags);
-            $this->exchange->declareExchange();
-        }
+        $this->exchange = new \AMQPExchange($this->channel());
+        $this->exchange->setType($this->exchangeType);
+        $this->exchange->setName($exchangeName);
+        $flags and $this->exchange->setFlags($flags);
+        $this->exchange->declareExchange();
         return $this->exchange;
     }
 
@@ -141,12 +135,12 @@ class PhpAmqp
      *                       AMQP_EXCLUSIVE, AMQP_AUTODELETE.
      * @return object
      */
-    public function queue($flags = AMQP_AUTODELETE)
+    public function queue($queueName = null, $flags = AMQP_AUTODELETE)
     {
         if (!$this->queue) {
             $this->queue = new \AMQPQueue($this->channel());
             $this->queue->setFlags($flags);
-            $this->queueName and $this->queue->setName($this->queueName);
+            $queueName and $this->queue->setName($queueName);
             $this->queue->declareQueue();
         }
         return $this->queue;
@@ -156,6 +150,8 @@ class PhpAmqp
      * Publish a message to an exchange.
      *
      * Publish a message to the exchange represented by the AMQPExchange object.
+     * AMQP_MANDATORY: When publishing a message, the message must be routed to a valid queue. If it is not, an error will be returned.
+     * AMQP_IMMEDIATE When publishing a message, mark this message for immediate processing by the broker. (High priority message.)
      *
      * @param string  $message     The message to publish.
      * @param string  $routing_key The optional routing key to which to publish to.
@@ -172,15 +168,15 @@ class PhpAmqp
      * @return boolean TRUE on success or FALSE on failure.
      *
      */
-    public function publish($routingKey, Amqp\AmqpEvent $event)
+    public function publish(Amqp\AmqpEvent $event)
     {
         $attributes = [
             "content_type" => $event->getContentType(),
         ];
-        $this->exchange()->publish(
+        $this->exchange($event->getExchangeName())->publish(
             $event->getBody(),
-            $routingKey,
-            AMQP_MANDATORY,
+            $event->getRoutingKey(),
+            AMQP_NOPARAM,
             $attributes
         );
     }
@@ -190,20 +186,12 @@ class PhpAmqp
      *
      * @param string $channel
      */
-    public function subscribe($routingKey)
+    public function subscribe($exchangeName, $routingKey)
     {
-        $this->queue()->bind($this->exchange()->getName(), $routingKey);
-    }
-
-
-    /**
-     * Run the Amqp event
-     *
-     * @return void
-     */
-    public function run($callback)
-    {
-        $this->queue()->consume($callback);
+        $this->queue()->bind(
+            $exchangeName,
+            $routingKey
+        );
     }
 
     /**
