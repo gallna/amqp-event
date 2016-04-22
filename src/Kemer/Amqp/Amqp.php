@@ -7,9 +7,14 @@ use Symfony\Component\EventDispatcher\Event;
 class Amqp
 {
     /**
-     * @var EventDispatcher
+     * @var Dispatcher
      */
-    protected $eventDispatcher;
+    protected $dispatcher;
+
+    /**
+     * @var consumer
+     */
+    protected $consumer;
 
     /**
      * @var broker
@@ -17,31 +22,14 @@ class Amqp
     protected $broker;
 
     /**
-     * @var string
-     */
-    protected $exchangeName;
-
-    /**
      * Constructor
      *
-     * @param EventDispatcher $eventDispatcher
+     * @param Dispatcher $dispatcher
      */
-    public function __construct($broker, $exchangeName, EventDispatcher $eventDispatcher = null)
+    public function __construct($broker, Dispatcher $dispatcher = null)
     {
         $this->broker = $broker;
-        $this->exchangeName = $exchangeName;
-        $this->eventDispatcher = $eventDispatcher ?: new Dispatcher();
-        $this->eventDispatcher->addListener("#", [$this, "onDispatch"]);
-    }
-
-    /**
-     * Get event dispatcher
-     *
-     * @return EventDispatcher
-     */
-    public function getEventDispatcher()
-    {
-        return $this->eventDispatcher;
+        $this->dispatcher = $dispatcher ?: new Dispatcher();
     }
 
     /**
@@ -54,21 +42,26 @@ class Amqp
         return $this->broker;
     }
 
+    /**
+     * Get event dispatcher
+     *
+     * @return dispatcher
+     */
+    public function getDispatcher()
+    {
+        return $this->dispatcher;
+    }
 
     /**
-     * On dispatch event listener - called on any event
+     * Returns broker
      *
-     * @param Event $event
-     * @param string $eventName
-     * @return void
+     * @return
      */
-    public function onDispatch(Event $event, $eventName)
+    public function addPublisher(Publisher\AbstractPublisher $publisher, $flags = null)
     {
-        if ($event instanceof PublishEvent) {
-            $event->envelope->setRoutingKey($eventName);
-            $event->envelope->setExchangeName($this->exchangeName);
-            $this->getBroker()->publish($event);
-        }
+        $exchange = $this->getExchange($publisher, $flags);
+        $this->getDispatcher()
+            ->addSubscriber(new Exchange\Subscriber($exchange));
     }
 
     /**
@@ -76,33 +69,56 @@ class Amqp
      *
      * @return void
      */
-    public function listen(array $events = [], $noack = false)
+    public function listen(Consumer\AbstractConsumer $consumer, $flags = null)
     {
-        $events = $events ?: array_keys($this->getEventDispatcher()->getListeners());
+        $events = array_keys($this->getDispatcher()->getListeners());
+        $exchange = $this->getExchange($consumer, $flags);
+        $queue = $this->getBroker()->queue($consumer->getQueueName());
         foreach ($events as $eventName) {
-            $this->getBroker()->subscribe($this->exchangeName, $eventName);
+            $queue->bind($consumer->getExchangeName(), $eventName);
         }
-        $this->getBroker()->queue()
-            ->consume(
-                [$this, 'onMessage'],
-                $noack ? AMQP_NOACK : AMQP_NOPARAM
-            );
+        $queue->consume(
+            is_callable($consumer) ? $consumer : new Consumer($this->getDispatcher()),
+            $consumer->getFlags()
+        );
     }
 
     /**
-     * Dispatch message events
+     * Creates exchange object
      *
-     * @param string $message
-     * @return void
+     * @param ExchangeName $exchangeName
+     * @param string $flags
+     * @return AMQPExchange
      */
-    public function onMessage(\AMQPEnvelope $envelope)
+    private function getExchange(Exchange\ExchangeName $exchangeName, $flags)
     {
-        $this->getEventDispatcher()->dispatch(
-            $envelope->getRoutingKey(),
-            new ConsumeEvent(
-                $envelope,
-                $this->getBroker()->queue()
-            )
+        return $this->getBroker()->exchange(
+            $exchangeName->getExchangeName(),
+            $this->getExchangeType($exchangeName),
+            $flags
+        );
+    }
+
+    /**
+     * Check event interface to find exchange type
+     *
+     * @param Event $event
+     * @return string
+     */
+    private function getExchangeType($object)
+    {
+        switch (true) {
+            case $object instanceof Exchange\Direct:
+                return AMQP_EX_TYPE_DIRECT;
+            case $object instanceof Exchange\Fanout:
+                return AMQP_EX_TYPE_FANOUT;
+            case $object instanceof Exchange\Headers:
+                return AMQP_EX_TYPE_HEADERS;
+            case $object instanceof Exchange\Topic:
+                return AMQP_EX_TYPE_TOPIC;
+        }
+        throw new \InvalidArgumentException(
+            "Not recognized exchange type"
         );
     }
 }
