@@ -4,17 +4,43 @@ namespace Kemer\Amqp;
 class ConsumeEvent extends AmqpEvent
 {
     /**
+     * @var AMQPEnvelope
+     */
+    public $envelope;
+
+    /**
      * @var AMQPQueue
      */
     public $queue;
 
     /**
-     * @param string $message
+     * @param AMQPEnvelope $envelope
+     * @param AMQPQueue $queue
      */
     public function __construct(\AMQPEnvelope $envelope, \AMQPQueue $queue)
     {
         $this->envelope = $envelope;
         $this->queue = $queue;
+    }
+
+    /**
+     * Returns AMQP envelope
+     *
+     * @return AMQPEnvelope
+     */
+    public function getEnvelope()
+    {
+        return $this->envelope;
+    }
+
+    /**
+     * Returns AMQP queue
+     *
+     * @return AMQPQueue
+     */
+    public function getQueue()
+    {
+        return $this->queue;
     }
 
     /**
