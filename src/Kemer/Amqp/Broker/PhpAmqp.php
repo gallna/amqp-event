@@ -112,14 +112,14 @@ class PhpAmqp
      *
      * @return object
      */
-    public function exchange($exchangeName, $flags = null)
+    public function exchange($exchangeName, $exchangeType = null, $flags = null)
     {
-        $this->exchange = new \AMQPExchange($this->channel());
-        $this->exchange->setType($this->exchangeType);
-        $this->exchange->setName($exchangeName);
-        $flags and $this->exchange->setFlags($flags);
-        $this->exchange->declareExchange();
-        return $this->exchange;
+        $exchange = new \AMQPExchange($this->channel());
+        $exchangeType and $exchange->setName($exchangeName);
+        $exchangeType and $exchange->setType($exchangeType);
+        $flags and $exchange->setFlags($flags);
+        $exchange->declareExchange();
+        return $exchange;
     }
 
 
@@ -173,12 +173,13 @@ class PhpAmqp
         $attributes = [
             "content_type" => $event->getContentType(),
         ];
-        $this->exchange($event->getExchangeName())->publish(
-            $event->getBody(),
-            $event->getRoutingKey(),
-            AMQP_NOPARAM,
-            $attributes
-        );
+        $this->exchange($event->getExchangeName(), $event->getType())
+            ->publish(
+                $event->getBody(),
+                $event->getRoutingKey(),
+                AMQP_NOPARAM,
+                $attributes
+            );
     }
 
     /**
