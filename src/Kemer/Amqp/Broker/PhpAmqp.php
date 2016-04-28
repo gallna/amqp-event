@@ -73,7 +73,7 @@ class PhpAmqp
     {
         if (!$this->connection) {
             if (!$this->host || !$this->port) {
-                throw \InvalidArgumentException(
+                throw new \InvalidArgumentException(
                     sprintf("Remote host or port undefined '%s:%s' ",
                         $this->host,
                         $this->port
