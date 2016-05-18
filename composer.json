@@ -1,8 +1,10 @@
 {
     "name": "gallna/amqp-event",
+    "description": "Amqp message dispatcher",
     "require": {
         "symfony/event-dispatcher": "~2.6",
-        "jane/open-api": "^1.2"
+        "php": ">=5.4.0",
+        "ext-amqp": "*"
     },
     "authors": [
         {
