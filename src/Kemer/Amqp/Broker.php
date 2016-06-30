@@ -1,9 +1,5 @@
 <?php
-namespace Kemer\Amqp\Broker;
-
-use PhpAmqpLib\Connection\AMQPStreamConnection;
-use PhpAmqpLib\Message\AMQPMessage;
-use Kemer\Amqp;
+namespace Kemer\Amqp;
 
 class Broker
 {
@@ -92,6 +88,7 @@ class Broker
      */
     public function channel()
     {
+        return new \AMQPChannel($this->connection());
         if (!$this->channel) {
             $this->channel = new \AMQPChannel($this->connection());
         }
