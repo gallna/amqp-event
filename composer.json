@@ -14,8 +14,12 @@
     ],
     "autoload": {
         "psr-4": {
-            "App\\": "examples/app",
             "Kemer\\Amqp\\": "src/Kemer/Amqp"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "App\\": "examples/app"
         }
     }
 }
