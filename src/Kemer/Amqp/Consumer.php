@@ -4,29 +4,29 @@ namespace Kemer\Amqp;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\EventDispatcher\Event;
 
-class Consumer
+class Consumer implements ConsumerInterface
 {
     /**
-     * @var EventDispatcher
+     * @var DispatcherInterface
      */
     protected $dispatcher;
 
     /**
-     * @param Dispatcher $dispatcher
+     * @param DispatcherInterface $dispatcher
      */
-    public function __construct(Dispatcher $dispatcher)
+    public function __construct(DispatcherInterface $dispatcher)
     {
         $this->dispatcher = $dispatcher;
     }
 
     /**
-     * Get event dispatcher
+     * Run the Amqp listener
      *
-     * @return EventDispatcher
+     * @return void
      */
-    public function getDispatcher()
+    public function listen(\AMQPQueue $queue, $flags = null)
     {
-        return $this->dispatcher;
+        $queue->consume($this, $flags);
     }
 
     /**
@@ -38,9 +38,15 @@ class Consumer
      */
     public function __invoke(\AMQPEnvelope $envelope, \AMQPQueue $queue)
     {
-        $this->getDispatcher()->dispatch(
-            $envelope->getRoutingKey(),
-            new ConsumeEvent($envelope, $queue)
-        );
+        $event = new ConsumeEvent($envelope, $queue);
+        try {
+            $this->dispatcher->dispatch($envelope->getRoutingKey(), $event);
+            $event->ack();
+        } catch (Exceptions\DelayException $e) {
+            echo $e->getMessage();
+            $retryEvent = new RetryEvent($envelope, $queue, $e->getExpiration(), $e->getRetryCount());
+            $this->getDispatcher()->dispatch(RetryEvent::RETRY, $retryEvent);
+            $event->ack();
+        }
     }
 }

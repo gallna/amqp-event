@@ -3,7 +3,7 @@ namespace Kemer\Amqp;
 
 use Symfony\Component\EventDispatcher\EventDispatcher;
 
-class Dispatcher extends EventDispatcher
+class Dispatcher extends EventDispatcher implements DispatcherInterface
 {
     /**
      * {@inheritdoc}

@@ -4,6 +4,7 @@ namespace App;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Kemer\Amqp\AmqpEvent;
+use Kemer\Amqp\Exceptions;
 
 class Subscriber implements EventSubscriberInterface
 {
@@ -26,8 +27,9 @@ class Subscriber implements EventSubscriberInterface
             __METHOD__,
             $eventName,
             $event->getRoutingKey(),
-            $event->getMessage()
+            $event->getBody()
         );
+        throw new Exceptions\DelayException("delay");
     }
 
     public function onKernelWarning(AmqpEvent $event, $eventName, EventDispatcher $dispatcher)
@@ -37,7 +39,7 @@ class Subscriber implements EventSubscriberInterface
             __METHOD__,
             $eventName,
             $event->getRoutingKey(),
-            $event->getMessage()
+            $event->getBody()
         );
     }
 }

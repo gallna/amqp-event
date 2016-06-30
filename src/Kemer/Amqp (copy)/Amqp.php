@@ -30,6 +30,9 @@ class Amqp
     {
         $this->broker = $broker;
         $this->dispatcher = $dispatcher ?: new Dispatcher();
+        $this->dispatcher->addSubscriber(
+            new Exchange\Subscriber($this->getBroker()->channel())
+        );
     }
 
     /**
@@ -59,9 +62,9 @@ class Amqp
      */
     public function addPublisher(Publisher\AbstractPublisher $publisher, $flags = null)
     {
-        $exchange = $this->getExchange($publisher, $flags);
+        //$exchange = $this->getExchange($publisher, $flags);
         $this->getDispatcher()
-            ->addSubscriber(new Exchange\Subscriber($exchange));
+            ->addSubscriber(new Exchange\Subscriber($this->getBroker()->channel()));
     }
 
     /**
@@ -69,18 +72,34 @@ class Amqp
      *
      * @return void
      */
-    public function listen(Consumer\AbstractConsumer $consumer, $flags = null)
+    public function listen($queue, callable $consumer = null, $flags = null)
     {
         $events = array_keys($this->getDispatcher()->getListeners());
-        $exchange = $this->getExchange($consumer, $flags);
-        $queue = $this->getBroker()->queue($consumer->getQueueName());
-        foreach ($events as $eventName) {
-            $queue->bind($consumer->getExchangeName(), $eventName);
+        if ($queue instanceof \AMQPExchange) {
+            $queue = $this->getQueueForExchange($queue);
+        }
+        if (!($queue instanceof \AMQPQueue)) {
+            throw new \InvalidArgumentException("Accept only AMQPExchange or AMQPQueue")
         }
         $queue->consume(
-            is_callable($consumer) ? $consumer : new Consumer($this->getDispatcher()),
-            $consumer->getFlags()
+            $consumer ?: new Consumer($this->getDispatcher(), $this->getBroker()),
+            $flags
         );
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getQueueForExchange(\AMQPExchange $exchange)
+    {
+        $queue = new \AMQPQueue($this->channel());
+        $queue->setFlags(AMQP_AUTODELETE);
+        $queue->declareQueue();
+        $events = array_keys($this->getDispatcher()->getListeners());
+        foreach ($events as $eventName) {
+            $queue->bind($exchange->getName(), $eventName);
+        }
+        return $queue;
     }
 
     /**

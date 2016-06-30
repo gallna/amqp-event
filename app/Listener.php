@@ -14,7 +14,7 @@ class Listener
             __METHOD__,
             $eventName,
             $event->getRoutingKey(),
-            $event->getMessage()
+            $event->getBody()
         );
     }
 
@@ -25,7 +25,7 @@ class Listener
             __METHOD__,
             $eventName,
             $event->getRoutingKey(),
-            $event->getMessage()
+            $event->getBody()
         );
     }
 }

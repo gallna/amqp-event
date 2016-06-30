@@ -9,9 +9,9 @@ use Kemer\Amqp\PublishEvent;
 class Subscriber implements EventSubscriberInterface
 {
     /**
-     * @var AMQPExchange
+     * @var AMQPChannel
      */
-    protected $exchange;
+    protected $channel;
 
     /**
      * {@inheritDoc}
@@ -24,11 +24,11 @@ class Subscriber implements EventSubscriberInterface
     }
 
     /**
-     * @param AMQPExchange $exchange
+     * @param AMQPChannel $channel
      */
-    public function __construct(\AMQPExchange $exchange)
+    public function __construct(\AMQPChannel $channel)
     {
-        $this->exchange = $exchange;
+        $this->channel = $channel;
     }
 
     /**
@@ -41,18 +41,20 @@ class Subscriber implements EventSubscriberInterface
     public function onDispatch(Event $event, $eventName)
     {
         if ($event instanceof PublishEvent) {
-            //$event->envelope->setRoutingKey($eventName);
-            //$event->envelope->setExchangeName($this->exchangeName);
-            //$event->envelope->setType($this->getExchangeType($event));
             $attributes = [
                 "content_type" => $event->getContentType(),
+                "expiration" => $event->getExpiration(),
             ];
-            $this->exchange->publish(
+
+            $exchange = new \AMQPExchange($this->channel);
+            $exchange->setName($event->getEnvelope()->getExchangeName());
+            $exchange->publish(
                 $event->getBody(),
                 $eventName,
                 AMQP_NOPARAM,
                 $attributes
             );
+            //var_dump($event, $exchange->getType()); die;
         }
     }
 }

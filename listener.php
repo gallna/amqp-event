@@ -1,27 +1,38 @@
 <?php
 include __DIR__.'/vendor/autoload.php';
 
-use Kemer\Amqp;
-use Kemer\Amqp\Broker\RabbitMQ;
-use Kemer\Amqp\Broker\PhpAmqp;
-use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
-use App\OnlineFeedListener;
+use Symfony\Component\EventDispatcher\Event;
+use Kemer\Library\LibraryEvent;
+use Kemer\Amqp;
 
-// create event dispatcher
-$eventDispatcher = new EventDispatcher();
-
-// create Amqp server
 $amqp = new Amqp\Amqp(
-    new PhpAmqp('localhost', 5672, 'guest', 'guest'),
-    $eventDispatcher
+    new Amqp\Broker\PhpAmqp(
+        "rabbitmq.amqp.development.companycheck.co.uk", 5672, 'guest', 'guest'
+    )
+);
+$dispatcher = $amqp->getDispatcher();
+
+// Send discover request
+$dispatcher->dispatch(
+    "LibraryEvent::DISCOVER",
+    new Amqp\PublishEvent()
 );
 
 // Add event listeners
-$eventDispatcher->addListener("kernel.*", [new App\Listener(), "onKernel"]);
-$eventDispatcher->addListener('#', [new App\Listener(), "onAll"]);
+$dispatcher->addListener("kernel.*", [new App\Listener(), "onKernel"]);
+$dispatcher->addListener('#', [new App\Listener(), "onAll"]);
 
 // Add event subscriber
-$eventDispatcher->addSubscriber(new App\Subscriber());
+$dispatcher->addSubscriber(new App\Subscriber());
 
-$amqp->run();
+// Listen on queue
+$queue = new AMQPQueue();
+$queue->setName("queueName");
+$amqp->listen($queue);
+
+// Listen on exchange
+$exchange = new AMQPExchange();
+$exchange->setName("exchangeName");
+$amqp->listen($exchange);
+

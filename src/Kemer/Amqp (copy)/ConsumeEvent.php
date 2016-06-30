@@ -88,10 +88,8 @@ class ConsumeEvent extends AmqpEvent
         return $this->queue->nack($this->envelope->getDeliveryTag(), $flags);
     }
 
-    public function retry($expiration = 10000, $retryCount = null)
+    public function wait($time = 10000)
     {
-        $event = new RetryEvent($this->getEnvelope(), $this->getQueue(), $expiration, $retryCount);
-        $this->getDispatcher()->dispatch(RetryEvent::RETRY, $event);
-        $this->ack();
+
     }
 }
