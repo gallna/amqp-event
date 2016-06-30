@@ -1,30 +1,30 @@
 <?php
-namespace Kemer\Amqp\Consumer;
+namespace Kemer\Amqp;
 
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\EventDispatcher\Event;
 use Kemer\Amqp\Exchange\ExchangeName;
 
-class ExchangeConsumer extends Consumer
+class ExchangeConsumer
 {
     /**
-     * @var AMQPChannel
+     * @var Broker
      */
-    protected $channel;
+    protected $broker;
 
     /**
-     * @var AMQPExchange
+     * @var Consumer
      */
-    protected $exchange;
+    protected $consumer;
 
     /**
-     * @param AMQPChannel $exchange
-     * @param AMQPExchange $exchange
+     * @param Consumer $consumer
+     * @param Broker $broker
      */
-    public function __construct(\AMQPChannel $channel, \AMQPExchange $exchange)
+    public function __construct(Consumer $consumer, Broker $broker)
     {
-        $this->channel = $channel;
-        $this->exchange = $exchange;
+        $this->consumer = $consumer;
+        $this->broker = $broker;
     }
 
     /**
@@ -32,15 +32,15 @@ class ExchangeConsumer extends Consumer
      *
      * @return void
      */
-    public function listen($flags = null)
+    public function listen(\AMQPExchange $exchange, $flags = null)
     {
-        $queue = new \AMQPQueue($this->channel());
+        $queue = new \AMQPQueue($this->broker->channel());
         $queue->setFlags(AMQP_AUTODELETE);
         $queue->declareQueue();
-        $events = array_keys($this->getDispatcher()->getListeners());
+        $events = array_keys($this->consumer->getDispatcher()->getListeners());
         foreach ($events as $eventName) {
-            $queue->bind($this->exchange->getName(), $eventName);
+            $queue->bind($exchange->getName(), $eventName);
         }
-        parent::listen($queue, $flags)
+        $this->consumer->listen($queue, $flags);
     }
 }
