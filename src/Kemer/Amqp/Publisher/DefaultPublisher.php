@@ -3,13 +3,15 @@ namespace Kemer\Amqp\Publisher;
 
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\EventDispatcher\Event;
+use Kemer\Amqp\Broker;
+use Kemer\Amqp;
 
 class DefaultPublisher implements EventSubscriberInterface
 {
     /**
-     * @var AMQPChannel
+     * @var Broker
      */
-    protected $channel;
+    protected $broker;
 
     /**
      * @var AMQPExchange
@@ -34,13 +36,13 @@ class DefaultPublisher implements EventSubscriberInterface
     }
 
     /**
-     * @param AMQPChannel $channel
+     * @param Broker $broker
      * @param AMQPExchange $defaultExchange
      * @param bool $stopPropagation
      */
-    public function __construct(\AMQPChannel $channel, \AMQPExchange $defaultExchange = null, $stopPropagation = true)
+    public function __construct(Broker $broker, \AMQPExchange $defaultExchange = null, $stopPropagation = true)
     {
-        $this->channel = $channel;
+        $this->broker = $broker;
         $this->defaultExchange = $defaultExchange;
         $this->stopPropagation = $stopPropagation;
     }
@@ -53,7 +55,7 @@ class DefaultPublisher implements EventSubscriberInterface
     protected function getDefaultExchange()
     {
         if (!$this->defaultExchange) {
-            $this->defaultExchange = new \AMQPExchange($this->channel);
+            $this->defaultExchange = new \AMQPExchange($this->broker->channel());
         }
         return $this->defaultExchange;
     }
@@ -67,11 +69,11 @@ class DefaultPublisher implements EventSubscriberInterface
      */
     public function onDispatch(Event $event, $eventName)
     {
-        if ($event instanceof PublishEvent) {
+        if ($event instanceof Amqp\PublishEvent) {
             if ($event->getEnvelope()->getExchangeName() === null) {
                 $exchange = $this->getDefaultExchange();
             } else {
-                $exchange = new \AMQPExchange($this->channel);
+                $exchange = new \AMQPExchange($this->broker->channel());
                 $exchange->setName($event->getEnvelope()->getExchangeName());
             }
 

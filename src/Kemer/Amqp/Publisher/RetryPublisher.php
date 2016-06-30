@@ -3,6 +3,8 @@ namespace Kemer\Amqp\Publisher;
 
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\EventDispatcher\Event;
+use Kemer\Amqp\Broker;
+use Kemer\Amqp;
 
 class RetryPublisher implements EventSubscriberInterface
 {
@@ -10,11 +12,6 @@ class RetryPublisher implements EventSubscriberInterface
      * @var AMQPChannel
      */
     protected $channel;
-
-    /**
-     * @var AMQPExchange
-     */
-    protected $defaultExchange;
 
     /**
      * @var bool Whether no further event listeners should be triggered
@@ -28,34 +25,19 @@ class RetryPublisher implements EventSubscriberInterface
     {
         return [
             '#' => [
-                ['onDispatch', 1000]
+                ['onDispatch', 1001]
             ]
         ];
     }
 
     /**
-     * @param AMQPChannel $channel
-     * @param AMQPExchange $defaultExchange
+     * @param Broker $broker
      * @param bool $stopPropagation
      */
-    public function __construct(\AMQPChannel $channel, \AMQPExchange $defaultExchange = null, $stopPropagation = true)
+    public function __construct(Broker $broker, $stopPropagation = true)
     {
-        $this->channel = $channel;
-        $this->defaultExchange = $defaultExchange;
+        $this->broker = $broker;
         $this->stopPropagation = $stopPropagation;
-    }
-
-    /**
-     * Creates if needed and returns default exchange
-     *
-     * @return AMQPExchange
-     */
-    protected function getDefaultExchange()
-    {
-        if (!$this->defaultExchange) {
-            $this->defaultExchange = new \AMQPExchange($this->channel);
-        }
-        return $this->defaultExchange;
     }
 
     /**
@@ -67,58 +49,53 @@ class RetryPublisher implements EventSubscriberInterface
      */
     public function onDispatch(Event $event, $eventName)
     {
-        if ($event instanceof RetryEvent) {
-            $this->delay($event->getEnvelope(), $event->getQueue());
+        if ($event instanceof Amqp\RetryEvent) {
+            if (!$event->expired()) {
+                $envelope = $event->getEnvelope();
+                $waitQueue = $this->getQueue($envelope);
+                $waitExchange = $this->getExchange($envelope);
+                $waitQueue->bind($waitExchange->getName(), $event->getRoutingKey());
+                $waitExchange->publish(
+                    $event->getBody(),
+                    $event->getRoutingKey(),
+                    AMQP_NOPARAM,
+                    $event->attributes()
+                );
+            }
 
             if ($this->stopPropagation) {
                 $event->stopPropagation();
             }
-            //var_dump($event, $exchange->getType()); die;
         }
     }
 
-
-    public function delay($envelope, $queue, $expiration = 10000)
+    /**
+     * Creates wait queue
+     *
+     * @return AMQPQueue
+     */
+    private function getQueue(\AMQPEnvelope $envelope)
     {
-        $queue->getName();
         $waitQueue = new \AMQPQueue($this->broker->channel());
         $waitQueue->setName($envelope->getExchangeName()."-wait");
         $waitQueue->setArgument("x-dead-letter-exchange", $envelope->getExchangeName());
-        $waitQueue->setFlags(AMQP_PASSIVE);
+        $waitQueue->setFlags(AMQP_DURABLE);
         $waitQueue->declareQueue();
-        $this->dispatch($envelope, $waitQueue, $expiration);
+        return $waitQueue;
     }
 
-    public function dispatch($envelope, $waitQueue, $expiration = 6000)
+    /**
+     * Creates wait exchange
+     *
+     * @return AMQPExchange
+     */
+    private function getExchange(\AMQPEnvelope $envelope)
     {
-        $headers = $envelope->getHeaders();
-        $headers["x-retry-count"] = isset($headers["x-retry-count"])
-            ? $headers["x-retry-count"] + 1
-            : 0;
-        $attributes = [
-            "app_id" => $envelope->getAppId(),
-            "user_id" => $envelope->getUserId(),
-            "message_id" => $envelope->getMessageId(),
-            "priority" => $envelope->getPriority(),
-            "type" => $envelope->getType(),
-            "reply_to" => $envelope->getReplyTo(),
-            "timestamp" => $envelope->getTimeStamp(),
-            "delivery_mode" => $envelope->getDeliveryMode(),
-            "content_type" => $envelope->getContentType(),
-            "expiration" => $expiration,
-            "headers" => $headers,
-        ];
         $exchange = new \AMQPExchange($this->broker->channel());
         $exchange->setName($envelope->getExchangeName()."-wait");
         $exchange->setType(AMQP_EX_TYPE_DIRECT);
-        $exchange->setFlags(AMQP_PASSIVE);
+        $exchange->setFlags(AMQP_DURABLE);
         $exchange->declare();
-        $waitQueue->bind($envelope->getExchangeName()."-wait", $envelope->getRoutingKey());
-        $exchange->publish(
-            $envelope->getBody(),
-            $envelope->getRoutingKey(),
-            AMQP_NOPARAM,
-            $attributes
-        );
+        return $exchange;
     }
 }
