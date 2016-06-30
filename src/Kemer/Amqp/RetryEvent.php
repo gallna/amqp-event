@@ -4,6 +4,7 @@ namespace Kemer\Amqp;
 class RetryEvent extends ConsumeEvent
 {
     const RETRY = "retry";
+
     /**
      * @var integer
      */
@@ -26,9 +27,9 @@ class RetryEvent extends ConsumeEvent
     }
 
     /**
-     * Returns AMQP envelope
+     * Returns message expiration time
      *
-     * @return AMQPEnvelope
+     * @return integer
      */
     public function getExpiration()
     {
@@ -36,12 +37,52 @@ class RetryEvent extends ConsumeEvent
     }
 
     /**
-     * Returns AMQP queue
+     * Returns message retry count
      *
-     * @return AMQPQueue
+     * @return integer
      */
     public function getRetryCount()
     {
         return $this->retryCount;
+    }
+
+    /**
+     * Checks if message was expired or retried too many times
+     *
+     * @return bool
+     */
+    public function expired()
+    {
+        if ($this->getRetryCount() > 0) {
+            return $this->attributes()["headers"]["x-retry-count"] <= 0;
+        }
+        return false;
+    }
+
+    /**
+     * Returns attributes send to wait exchange
+     *
+     * @return array
+     */
+    public function attributes()
+    {
+        $envelope = $this->getEnvelope();
+        $headers = $envelope->getHeaders();
+        $headers["x-retry-count"] = isset($headers["x-retry-count"])
+            ? --$headers["x-retry-count"]
+            : $this->getRetryCount();
+        return [
+            "app_id" => $envelope->getAppId(),
+            "user_id" => $envelope->getUserId(),
+            "message_id" => $envelope->getMessageId(),
+            "priority" => $envelope->getPriority(),
+            "type" => $envelope->getType(),
+            "reply_to" => $envelope->getReplyTo(),
+            "timestamp" => $envelope->getTimeStamp(),
+            "delivery_mode" => $envelope->getDeliveryMode(),
+            "content_type" => $envelope->getContentType(),
+            "expiration" => $this->getExpiration(),
+            "headers" => $headers,
+        ];
     }
 }
