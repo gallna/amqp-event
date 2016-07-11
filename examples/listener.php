@@ -10,6 +10,7 @@ $broker = new Amqp\Broker(
 $dispatcher = new Amqp\Dispatcher();
 $dispatcher->addSubscriber(new Amqp\Publisher\DefaultPublisher($broker));
 $dispatcher->addSubscriber(new Amqp\Publisher\RetryPublisher($broker));
+$dispatcher->addSubscriber(new Amqp\Publisher\DeadLetterPublisher($broker));
 
 
 

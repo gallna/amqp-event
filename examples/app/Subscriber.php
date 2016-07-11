@@ -43,6 +43,7 @@ class Subscriber implements EventSubscriberInterface
     public function onKernelWarning(AmqpEvent $event, $eventName, EventDispatcher $dispatcher)
     {
         $this->display($event, $eventName, __METHOD__);
+        throw new \Exception("Dead-letter exception");
     }
 
     public function onKernelCritical(AmqpEvent $event, $eventName, EventDispatcher $dispatcher)
