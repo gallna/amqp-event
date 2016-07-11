@@ -57,6 +57,10 @@ class Consumer
             echo "[".$retryEvent->attributes()["headers"]["x-retry-count"]."] ".$e->getMessage()."\n";
             $this->getDispatcher()->dispatch(RetryEvent::RETRY, $retryEvent);
             $event->ack();
+        } catch (\Exception $e) {
+            $event = new DeadLetterEvent($envelope, $queue, $e);
+            $this->getDispatcher()->dispatch(DeadLetterEvent::SEND, $event);
+            $event->ack();
         }
     }
 }
