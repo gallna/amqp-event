@@ -40,8 +40,8 @@ class DeadLetterEvent extends ConsumeEvent
         $envelope = $this->getEnvelope();
         $headers = $envelope->getHeaders();
         $headers["x-exception"] = [
-            "message" => $this->getException() ?? $this->getException()->getMessage(),
-            "code" => $this->getException() ?? $this->getException()->getCode(),
+            "message" => $this->getException() ? $this->getException()->getMessage() : null,
+            "code" => $this->getException() ? $this->getException()->getCode() : null,
         ];
 
         return [
