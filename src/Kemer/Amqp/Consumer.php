@@ -51,16 +51,28 @@ class Consumer
         $event = new ConsumeEvent($envelope, $queue);
         try {
             $this->dispatcher->dispatch($envelope->getRoutingKey(), $event);
-            $event->ack();
+            echo "OK: \n";
         } catch (Exceptions\DelayException $e) {
-            $retryEvent = new RetryEvent($envelope, $queue, $e->getExpiration(), $e->getRetryCount());
-            echo "[".$retryEvent->attributes()["headers"]["x-retry-count"]."] ".$e->getMessage()."\n";
-            $this->getDispatcher()->dispatch(RetryEvent::RETRY, $retryEvent);
-            $event->ack();
+            $this->getDispatcher()->dispatch(
+                RetryEvent::RETRY,
+                $event = new RetryEvent($envelope, $queue, $e->getExpiration(), $e->getRetryCount())
+            );
+            echo "[".$event->attributes()["headers"]["x-retry-count"]."] ".$e->getMessage()."\n";
+            if (!$event->isConsumed()) {
+                throw $e;
+            }
         } catch (\Exception $e) {
-            $event = new DeadLetterEvent($envelope, $queue, $e);
-            $this->getDispatcher()->dispatch(DeadLetterEvent::SEND, $event);
-            $event->ack();
+            $this->getDispatcher()->dispatch(
+                DeadLetterEvent::SEND,
+                $event = new DeadLetterEvent($envelope, $queue, $e)
+            );
+            echo "Error: ".$e->getMessage()."\n";
+            if (!$event->isConsumed()) {
+                throw $e;
+            }
+        }
+        if (!$event->isConsumed()) {
+            $event->reject();
         }
     }
 }

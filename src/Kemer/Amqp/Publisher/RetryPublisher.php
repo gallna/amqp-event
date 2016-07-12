@@ -62,7 +62,7 @@ class RetryPublisher implements EventSubscriberInterface
                     $event->attributes()
                 );
             }
-
+            $event->ack();
             if ($this->stopPropagation) {
                 $event->stopPropagation();
             }

@@ -60,7 +60,7 @@ class DeadLetterPublisher implements EventSubscriberInterface
                 AMQP_NOPARAM,
                 $event->attributes()
             );
-
+            $event->ack();
             if ($this->stopPropagation) {
                 $event->stopPropagation();
             }

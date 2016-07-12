@@ -14,6 +14,11 @@ class ConsumeEvent extends AmqpEvent
     public $queue;
 
     /**
+     * @var bool
+     */
+    private $consumed = false;
+
+    /**
      * @param AMQPEnvelope $envelope
      * @param AMQPQueue $queue
      */
@@ -51,6 +56,7 @@ class ConsumeEvent extends AmqpEvent
      */
     public function ack()
     {
+        $this->consumed = true;
         return $this->queue->ack($this->envelope->getDeliveryTag());
     }
 
@@ -65,7 +71,8 @@ class ConsumeEvent extends AmqpEvent
      */
     public function reject($flags = AMQP_NOPARAM)
     {
-        return $this->queue->nack($this->envelope->getDeliveryTag(), $flags);
+        $this->consumed = true;
+        return $this->queue->reject($this->envelope->getDeliveryTag(), $flags);
     }
 
     /**
@@ -85,13 +92,26 @@ class ConsumeEvent extends AmqpEvent
      */
     public function nack($flags = AMQP_NOPARAM)
     {
+        $this->consumed = true;
         return $this->queue->nack($this->envelope->getDeliveryTag(), $flags);
+    }
+
+    /**
+     * Allows to see if event was processed by listener
+     *
+     * @return bool
+     */
+    public function isConsumed()
+    {
+        return $this->consumed;
     }
 
     public function retry($expiration = 10000, $retryCount = null)
     {
-        $event = new RetryEvent($this->getEnvelope(), $this->getQueue(), $expiration, $retryCount);
-        $this->getDispatcher()->dispatch(RetryEvent::RETRY, $event);
+        $this->getDispatcher()->dispatch(
+            RetryEvent::RETRY,
+            new RetryEvent($this->getEnvelope(), $this->getQueue(), $expiration, $retryCount)
+        );
         $this->ack();
     }
 }
