@@ -86,10 +86,9 @@ class Broker
      *
      * @return object
      */
-    public function channel()
+    public function channel($reuse = true)
     {
-        return new \AMQPChannel($this->connection());
-        if (!$this->channel) {
+        if (!$this->channel || !$reuse) {
             $this->channel = new \AMQPChannel($this->connection());
         }
         return $this->channel;
@@ -98,18 +97,57 @@ class Broker
     /**
      * Returns exchange
      * Exchange types: direct, topic, headers and fanout.
-     * AMQP_DURABLE AMQP_PASSIVE
+     * AMQP_EX_TYPE_DIRECT AMQP_EX_TYPE_FANOUT AMQP_EX_TYPE_TOPIC AMQP_EX_TYPE_HEADER
+     * AMQP_DURABLE Durable exchanges will survive a broker restart,
+     * AMQP_PASSIVE Passive exchanges will not be redeclared, but the broker will throw
+     *              an error if the exchange does not exist.
      *
-     * @return object
+     * @return AMQPExchange
+     * @throws AMQPChannelException
+     * @throws AMQPExchangeException
      */
-    public function exchange($name = null, $flags = null)
+    public function exchange($flags = null, $name = null, $type = null)
     {
         $exchange = new \AMQPExchange($this->channel());
-        $name and $exchange->setName($name);
         $flags and $exchange->setFlags($flags);
+        $type and $exchange->setType($type);
+        $name and $exchange->setName($name);
         return $exchange;
     }
 
+    /**
+     * Returns declared exchange
+     *
+     * @return AMQPExchange
+     * @throws AMQPChannelException
+     * @throws AMQPExchangeException
+     */
+    public function declareExchange(...$parameters)
+    {
+        $exchange = $this->exchange(...$parameters);
+        $exchange->declareExchange();
+        return $exchange;
+    }
+
+    /**
+     * Checks if the named exchange exists.
+     * In response RabbitMQ responds with a channel exception if the exchange does not exist.
+     * AMQP_PASSIVE Passive exchanges will not be redeclared, but the broker will throw
+     *              an error if the exchange does not exist.
+     *
+     * @return bool
+     */
+    public function exchangeExists($name, $type)
+    {
+        try {
+            return $this->declareExchange(AMQP_PASSIVE, $name, $type) instanceof \AMQPExchange;
+        } catch (\AMQPExchangeException $e) {
+            if (strpos($e->getMessage(), "404") > 0) {
+                return false;
+            }
+            throw $e;
+        }
+    }
 
     /**
      * Returns queue
@@ -118,17 +156,55 @@ class Broker
      * AMQP_EXCLUSIVE used by only one connection and the queue will be deleted
      *  when that connection closes
      *
+     * AMQP_DURABLE Durable queues will survive a broker restart,
+     * AMQP_PASSIVE Passive will not be redeclared, but the broker will throw
+     *              an error if the queue does not exist.
      * @param integer $flags A bitmask of flags:
      *                       AMQP_DURABLE, AMQP_PASSIVE,
      *                       AMQP_EXCLUSIVE, AMQP_AUTODELETE.
-     * @return object
+     * @return AMQPQueue
+     * @throws AMQPQueueException
      */
-    public function queue($name = null, $flags = null)
+    public function queue($flags = null, $name = null)
     {
         $queue = new \AMQPQueue($this->channel());
         $name and $queue->setName($name);
         $flags and $queue->setFlags($flags);
         return $queue;
+    }
+
+    /**
+     * Returns declared exchange
+     *
+     * @return AMQPQueue
+     * @throws AMQPChannelException
+     */
+    public function declareQueue(...$parameters)
+    {
+        $queue = $this->queue(...$parameters);
+        $queue->declareQueue();
+        return $queue;
+    }
+
+    /**
+     * Checks if the named queue exists.
+     * In response RabbitMQ responds with a channel exception if the queue does not exist.
+     * AMQP_PASSIVE Passive exchanges will not be redeclared, but the broker will throw
+     *              an error if the exchange does not exist.
+     *
+     * @return bool
+     */
+    public function queueExists($name)
+    {
+        try {
+            return $this->declareQueue(AMQP_PASSIVE, $name) instanceof \AMQPQueue;
+        } catch (\AMQPChannelException $e) {
+            if (strpos($e->getMessage(), "404") > 0) {
+                echo "OK";
+                return false;
+            }
+            throw $e;
+        }
     }
 
     /**

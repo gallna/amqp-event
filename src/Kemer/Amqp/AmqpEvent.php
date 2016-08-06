@@ -1,7 +1,7 @@
 <?php
 namespace Kemer\Amqp;
 
-use Symfony\Component\EventDispatcher\Event;
+use Symfony\Component\EventDispatcher\Event as SymfonyEvent;
 
 /*
 AMQPEnvelope::getAppId — Get the message appid
@@ -23,48 +23,43 @@ AMQPEnvelope::getType — Get the message type
 AMQPEnvelope::getUserId — Get the message user id
 AMQPEnvelope::isRedelivery — Whether this is a redelivery of the message
 */
-class AmqpEvent extends Event
+class AmqpEvent extends SymfonyEvent
 {
-    public $envelope;
+    use BasicPropertiesTrait;
+
+    const DEAD_LETTER_RETRY = 'kemer.dead-letter.retry';
+    const DEAD_LETTER = 'kemer.dead-letter';
+    const POSTPONE = 'kemer.postpone';
 
     /**
-     * @param object $envelope
+     * @param string $body
+     * @param string $contentType
      */
-    public function __construct($envelope)
+    public function __construct($body = null, $contentType = null)
     {
-        $this->envelope = $envelope;
+        $this->setBody($body);
+        $this->setContentType($contentType);
     }
 
     /**
-     * Returns message
+     * Returns deserialized message body (if any), based on message declared content-type.
+     *      Typically be an array or object.
      *
-     * @return string
+     * @return mixed
      */
     public function getParsedBody()
     {
-        switch ($contenttype = $this->getContentType()) {
+        switch ($this->getContentType()) {
             case 'text/xml':
             case 'application/xml':
                 $backup = libxml_disable_entity_loader(true);
-                $result = simplexml_load_string($this->envelope->getBody());
+                $result = simplexml_load_string($this->getBody());
                 libxml_disable_entity_loader($backup);
                 return $result;
-            case 'application/json' :
-                return json_decode($this->envelope->getBody(), true);
+            case 'application/json':
+                return json_decode($this->getBody(), true);
             default:
-                return null;
+                return $this->getBody();
         }
-    }
-
-    /**
-     * Handle dynamic calls.
-     *
-     * @param  string  $method
-     * @param  array   $parameters
-     * @return $this
-     */
-    public function __call($method, $parameters)
-    {
-        return $this->envelope->{$method}(...$parameters);
     }
 }

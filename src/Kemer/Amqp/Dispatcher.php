@@ -3,7 +3,12 @@ namespace Kemer\Amqp;
 
 use Symfony\Component\EventDispatcher\EventDispatcher;
 
-class Dispatcher extends EventDispatcher implements DispatcherInterface
+/**
+ * The routing key used for a topic exchange MUST consist of zero or more words delimited by dots.
+ * Each word may contain the letters A-Z and a-z and digits 0-9.
+ * https://www.rabbitmq.com/resources/specs/amqp0-9-1.pdf
+ */
+class Dispatcher extends EventDispatcher
 {
     /**
      * {@inheritdoc}

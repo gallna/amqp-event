@@ -4,48 +4,30 @@ namespace Kemer\Amqp;
 /**
  * stub class representing AMQPEnvelope from pecl-amqp
  */
-class Envelope
+trait BasicPropertiesTrait
 {
     private $appId;
-    private $body;
     private $contentEncoding;
     private $contentType;
     private $correlationId;
     private $deliveryMode;
-    private $deliveryTag;
-    private $exchangeName;
     private $expiration;
-    private $headers;
     private $priority;
     private $replyTo;
-    private $routingKey;
     private $type;
     private $userId;
-    private $redelivery;
+    private $messageId;
+    private $timestamp;
+    private $headers = [];
+    private $body;
 
-    public static function fromEnvelope(\AMQPEnvelope $envelope)
-    {
-        $self = new static();
-        $self->setAppId($envelope->getAppId());
-        $self->setBody($envelope->getBody());
-        $self->setContentEncoding($envelope->getContentEncoding());
-        $self->setContentType($envelope->getContentType());
-        $self->setCorrelationId($envelope->getCorrelationId());
-        $self->setDeliveryMode($envelope->getDeliveryMode());
-        $self->setDeliveryTag($envelope->getDeliveryTag());
-        $self->setExchangeName($envelope->getExchangeName());
-        $self->setExpiration($envelope->getExpiration());
-        $self->setHeaders($envelope->getHeaders());
-        $self->setMessageId($envelope->getMessageId());
-        $self->setPriority($envelope->getPriority());
-        $self->setReplyTo($envelope->getReplyTo());
-        $self->setRoutingKey($envelope->getRoutingKey());
-        $self->setTimeStamp($envelope->getTimeStamp());
-        $self->setType($envelope->getType());
-        $self->setUserId($envelope->getUserId());
-        $self->setRedelivery($envelope->isRedelivery());
-        return $self;
-    }
+    // Moved to PublishEvent
+    // private $exchangeName;
+    // private $routingKey;
+    // Moved to ConsumeEvent
+    // private $deliveryTag;
+    // private $consumerTag;
+    // private $redelivery;
 
     /**
      * Get the application id of the message.
@@ -153,7 +135,8 @@ class Envelope
     }
 
     /**
-     * Get the delivery mode of the message.
+     * Get the delivery mode of the message. (persistent or not)
+     * Messages may be published as persistent, which makes the AMQP broker persist them to disk
      *
      * @return integer The delivery mode of the message.
      */
@@ -173,47 +156,6 @@ class Envelope
         return $this;
     }
 
-    /**
-     * Get the delivery tag of the message.
-     *
-     * @return string The delivery tag of the message.
-     */
-    public function getDeliveryTag()
-    {
-        return $this->deliveryTag;
-    }
-
-    /**
-     * Get the delivery tag of the message.
-     *
-     * @param tag of the message.
-     */
-    public function setDeliveryTag($deliveryTag)
-    {
-        $this->deliveryTag = $deliveryTag;
-        return $this;
-    }
-
-    /**
-     * Get the exchange name on which the message was published.
-     *
-     * @return string The exchange name on which the message was published.
-     */
-    public function getExchangeName()
-    {
-        return $this->exchangeName;
-    }
-
-    /**
-     * Get the exchange name on which the message was published.
-     *
-     * @param the message was published.
-     */
-    public function setExchangeName($exchangeName)
-    {
-        $this->exchangeName = $exchangeName;
-        return $this;
-    }
 
     /**
      * Get the expiration of the message.
@@ -239,26 +181,25 @@ class Envelope
     /**
      * Get a specific message header.
      *
-     * @param string $header_key Name of the header to get the value from.
-     *
+     * @param string $key Name of the header to get the value from.
      * @return string|boolean The contents of the specified header or FALSE
      *                        if not set.
      */
-    public function getHeader($header_key)
+    public function getHeader($key, $default = null)
     {
-        return $this->headers[$header_key];
+        return $this->hasHeader($key) ? $this->headers[$key] : $default;
     }
 
     /**
      * Check whether specific message header exists.
      *
-     * @param string $header_key Name of the header to check.
+     * @param string $key Name of the header to check.
      *
      * @return boolean
      */
-    public function hasHeader($header_key)
+    public function hasHeader($key)
     {
-      return isset($this->headers[$header_key]);
+      return isset($this->headers[$key]);
     }
 
     /**
@@ -272,13 +213,37 @@ class Envelope
     }
 
     /**
-     * Get the headers of the message.
+     * Set message headers.
      *
      * @param of key value pairs associated with the message.
      */
     public function setHeaders(array $headers)
     {
         $this->headers = $headers;
+        return $this;
+    }
+
+    /**
+     * Add message header.
+     *
+     * @param $key key to add
+     */
+    public function addHeader($key, $header)
+    {
+        $this->headers[$key] = $header;
+        return $this;
+    }
+
+    /**
+     * Remove header by key.
+     *
+     * @param $key key to remove
+     */
+    public function removeHeader($key)
+    {
+        if ($this->hasHeader($key)) {
+            unset($this->headers[$key]);
+        }
         return $this;
     }
 
@@ -346,34 +311,13 @@ class Envelope
     }
 
     /**
-     * Get the routing key of the message.
-     *
-     * @return string The message routing key.
-     */
-    public function getRoutingKey()
-    {
-        return $this->routingKey;
-    }
-
-    /**
-     * Get the routing key of the message.
-     *
-     * @param The message routing key.
-     */
-    public function setRoutingKey($routingKey)
-    {
-        $this->routingKey = $routingKey;
-        return $this;
-    }
-
-    /**
      * Get the timestamp of the message.
      *
      * @return string The message timestamp.
      */
     public function getTimeStamp()
     {
-        return $this->timeStamp;
+        return $this->timestamp;
     }
 
     /**
@@ -381,9 +325,9 @@ class Envelope
      *
      * @param The message timestamp.
      */
-    public function setTimeStamp($timeStamp)
+    public function setTimeStamp($timestamp)
     {
-        $this->timeStamp = $timeStamp;
+        $this->timestamp = $timestamp;
         return $this;
     }
 
@@ -430,29 +374,36 @@ class Envelope
     }
 
     /**
-     * Whether this is a redelivery of the message.
+     * Returns basic attributes as an array
+     * Shortcut to jsonSerialize()
      *
-     * Whether this is a redelivery of a message. If this message has been
-     * delivered and AMQPEnvelope::nack() was called, the message will be put
-     * back on the queue to be redelivered, at which point the message will
-     * always return TRUE when this method is called.
-     *
-     * @return bool TRUE if this is a redelivery, FALSE otherwise.
+     * @return array
      */
-    public function isRedelivery()
+    public function attributes()
     {
-        return $this->redelivery;
+        return $this->jsonSerialize();
     }
 
     /**
-     * Whether this is a redelivery of the message.
-     *
-     * @param bool TRUE if this is a redelivery, FALSE otherwise.
+     * {@inheritdoc} JsonSerializable
      */
-    public function setRedelivery($redelivery)
+    public function jsonSerialize()
     {
-        $this->redelivery = $redelivery;
-        return $this;
+        return array_filter([
+            "app_id" => $this->getAppId(),
+            "user_id" => $this->getUserId(),
+            "message_id" => $this->getMessageId(),
+            "priority" => $this->getPriority(),
+            "type" => $this->getType(),
+            "reply_to" => $this->getReplyTo(),
+            "timestamp" => $this->getTimeStamp(),
+            "delivery_mode" => $this->getDeliveryMode(),
+            "content_type" => $this->getContentType(),
+            "content-encoding" => $this->getContentEncoding(),
+            "expiration" => $this->getExpiration(),
+            "correlation-id" => $this->getCorrelationId(),
+            "headers" => $this->getHeaders(),
+        ]);
     }
 }
 

@@ -26,44 +26,50 @@ class Subscriber implements EventSubscriberInterface
     private function display(AmqpEvent $event, $eventName, $methodName, $color = "1;32")
     {
         echo sprintf(
-            "\033[%sm %s\033[0m\033[36m [%s]\033[0m %s: %s \n",
+            "\033[%sm %s@%s\033[0m\033[36m [%s]\033[0m %s: %s \n",
             $color,
-            $eventName,
+            $event->getExchangeName(),
             $event->getRoutingKey(),
+            $eventName,
             $methodName,
             $event->getBody()
         );
     }
 
+    public function onKernelCritical(AmqpEvent $event, $eventName, EventDispatcher $dispatcher)
+    {
+        $this->display($event, $eventName, __METHOD__);
+        $event->ack();
+    }
+
     public function onKernelError(AmqpEvent $event, $eventName, EventDispatcher $dispatcher)
     {
         $this->display($event, $eventName, __METHOD__);
+        throw new \LogicException("Dead-letter exception");
+        $event->ack();
     }
 
     public function onKernelWarning(AmqpEvent $event, $eventName, EventDispatcher $dispatcher)
     {
         $this->display($event, $eventName, __METHOD__);
-        throw new \Exception("Dead-letter exception");
-    }
-
-    public function onKernelCritical(AmqpEvent $event, $eventName, EventDispatcher $dispatcher)
-    {
-        $this->display($event, $eventName, __METHOD__);
+        $event->ack();
     }
 
     public function onKernelNotice(AmqpEvent $event, $eventName, EventDispatcher $dispatcher)
     {
         $this->display($event, $eventName, __METHOD__);
+        $event->ack();
     }
 
     public function onKernelInfo(AmqpEvent $event, $eventName, EventDispatcher $dispatcher)
     {
         $this->display($event, $eventName, __METHOD__, 34);
+        $event->ack();
     }
 
     public function onKernelWait(AmqpEvent $event, $eventName, EventDispatcher $dispatcher)
     {
         $this->display($event, $eventName, __METHOD__, 31);
-        throw new Exceptions\DelayException(1000, 3);
+        $event->ack();
     }
 }

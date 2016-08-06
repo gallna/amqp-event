@@ -1,8 +1,7 @@
 <?php
 namespace Kemer\Amqp;
 
-use Symfony\Component\EventDispatcher\EventDispatcher;
-use Symfony\Component\EventDispatcher\Event;
+use Symfony\Component\EventDispatcher\GenericEvent as SymfonyEvent;
 
 class Consumer
 {
@@ -12,9 +11,18 @@ class Consumer
     private $dispatcher;
 
     /**
+     * Specifies the identifier for the consumer. The consumer tag is local to
+     * a channel, so two clients can use the same consumer tags. If this field
+     * is empty the server will generate a unique tag
+     *
+     * @var string
+     */
+    private $consumerTag;
+
+    /**
      * @param DispatcherInterface $dispatcher
      */
-    public function __construct(DispatcherInterface $dispatcher)
+    public function __construct(Dispatcher $dispatcher)
     {
         $this->dispatcher = $dispatcher;
     }
@@ -30,49 +38,84 @@ class Consumer
     }
 
     /**
-     * Run the Amqp listener
+     * Specifies the identifier for the consumer.
+     *
+     * @return string The consumer tag.
+     */
+    public function getConsumerTag()
+    {
+        return $this->consumerTag;
+    }
+
+    /**
+     * Get the consumer tag of the message.
+     *
+     * @param message consumer tag.
+     */
+    public function setConsumerTag($consumerTag)
+    {
+        $this->consumerTag = $consumerTag;
+        return $this;
+    }
+
+    /**
+     * Bind queue to exchange using dispatcher event names as routing keys
      *
      * @return void
+     * @throws AMQPExchangeException
      */
-    public function listen(\AMQPQueue $queue, $flags = null)
+    public function bind(\AMQPQueue $queue, \AMQPExchange $exchange)
     {
+        $events = array_keys($this->getDispatcher()->getListeners());
+        foreach ($events as $eventName) {
+            $queue->bind($exchange->getName(), $eventName);
+        }
+    }
+
+    /**
+     * Run queue consumer. Blocking function that will retrieve next messages from the queue
+     * as it becomes available and will pass it off to the __invoke method.
+     * Bind given queue to to provided exchange on all used events as routing keys.
+     *
+     * @param AMQPQueue $queue
+     * @param AMQPExchange|null $exchange
+     * @param integer $flags AMQP_AUTOACK the messages will be immediately marked as acknowledged by the server upon delivery.
+     * @return void
+     */
+    public function listen(\AMQPQueue $queue, \AMQPExchange $exchange = null, $flags = AMQP_NOPARAM)
+    {
+        $exchange and $this->bind($queue, $exchange);
         $queue->consume($this, $flags);
     }
 
     /**
-     * Dispatch message events
+     * A callback function to which the consumed message will be passed.
+     * All messages are dispatched as events.
+     * Catched errors are dispatched as well using special event "kemer.error".
+     * NotConsumedException is threw - when dispatched message is not marked
+     * as `consumed` either by acknowledging or rejecting
      *
      * @param AMQPEnvelope $envelope
      * @param AMQPQueue $queue
      * @return void
+     * @throws Exceptions\ConsumerException
+     * @throws Exceptions\NotConsumedException
      */
     public function __invoke(\AMQPEnvelope $envelope, \AMQPQueue $queue)
     {
         $event = new ConsumeEvent($envelope, $queue);
+        //return $event->reject(false);
         try {
-            $this->dispatcher->dispatch($envelope->getRoutingKey(), $event);
-            echo "OK: \n";
-        } catch (Exceptions\DelayException $e) {
-            $this->getDispatcher()->dispatch(
-                RetryEvent::RETRY,
-                $event = new RetryEvent($envelope, $queue, $e->getExpiration(), $e->getRetryCount())
-            );
-            echo "[".$event->attributes()["headers"]["x-retry-count"]."] ".$e->getMessage()."\n";
-            if (!$event->isConsumed()) {
-                throw $e;
-            }
+            $this->dispatcher->dispatch($event->getRoutingKey(), $event);
         } catch (\Exception $e) {
-            $this->getDispatcher()->dispatch(
-                DeadLetterEvent::SEND,
-                $event = new DeadLetterEvent($envelope, $queue, $e)
-            );
-            echo "Error: ".$e->getMessage()."\n";
+            $this->dispatcher
+                ->dispatch("kemer.error", new SymfonyEvent($event, ["error" => $e]));
             if (!$event->isConsumed()) {
-                throw $e;
+                throw new Exceptions\ConsumerException($event, $e);
             }
         }
         if (!$event->isConsumed()) {
-            $event->reject();
+            throw new Exceptions\NotConsumedException($event);
         }
     }
 }

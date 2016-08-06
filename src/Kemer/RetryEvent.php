@@ -1,7 +1,7 @@
 <?php
 namespace Kemer\Amqp;
 
-class RetryEvent extends ConsumeEvent
+class RetryEvent extends Event
 {
     const RETRY = "retry";
 
@@ -16,14 +16,30 @@ class RetryEvent extends ConsumeEvent
     public $retryCount;
 
     /**
-     * @param AMQPEnvelope $envelope
-     * @param AMQPQueue $queue
+     * @var ConsumeEvent
      */
-    public function __construct(\AMQPEnvelope $envelope, \AMQPQueue $queue, $expiration, $retryCount)
+    public $event;
+
+    /**
+     * @param ConsumeEvent $event
+     * @param integer $expiration
+     * @param integer $retryCount
+     */
+    public function __construct(ConsumeEvent $event, $expiration, $retryCount)
     {
-        parent::__construct($envelope, $queue);
+        $this->event = $event;
         $this->expiration = $expiration;
         $this->retryCount = $retryCount;
+    }
+
+    /**
+     * Returns Exception triggered this event
+     *
+     * @return ConsumeEvent
+     */
+    public function getConsumeEvent()
+    {
+        return $this->event;
     }
 
     /**
@@ -66,21 +82,20 @@ class RetryEvent extends ConsumeEvent
      */
     public function attributes()
     {
-        $envelope = $this->getEnvelope();
-        $headers = $envelope->getHeaders();
+        $headers = $this->event->getHeaders();
         $headers["x-retry-count"] = isset($headers["x-retry-count"])
             ? --$headers["x-retry-count"]
             : $this->getRetryCount();
         return [
-            "app_id" => $envelope->getAppId(),
-            "user_id" => $envelope->getUserId(),
-            "message_id" => $envelope->getMessageId(),
-            "priority" => $envelope->getPriority(),
-            "type" => $envelope->getType(),
-            "reply_to" => $envelope->getReplyTo(),
-            "timestamp" => $envelope->getTimeStamp(),
-            "delivery_mode" => $envelope->getDeliveryMode(),
-            "content_type" => $envelope->getContentType(),
+            "app_id" => $this->event->getAppId(),
+            "user_id" => $this->event->getUserId(),
+            "message_id" => $this->event->getMessageId(),
+            "priority" => $this->event->getPriority(),
+            "type" => $this->event->getType(),
+            "reply_to" => $this->event->getReplyTo(),
+            "timestamp" => $this->event->getTimeStamp(),
+            "delivery_mode" => $this->event->getDeliveryMode(),
+            "content_type" => $this->event->getContentType(),
             "expiration" => $this->getExpiration(),
             "headers" => $headers,
         ];

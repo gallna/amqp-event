@@ -3,6 +3,8 @@ namespace Kemer\Amqp;
 
 class ConsumeEvent extends AmqpEvent
 {
+    use ConsumePropertiesTrait;
+
     /**
      * @var AMQPEnvelope
      */
@@ -24,18 +26,8 @@ class ConsumeEvent extends AmqpEvent
      */
     public function __construct(\AMQPEnvelope $envelope, \AMQPQueue $queue)
     {
-        $this->envelope = $envelope;
+        $this->fromEnvelope($envelope);
         $this->queue = $queue;
-    }
-
-    /**
-     * Returns AMQP envelope
-     *
-     * @return AMQPEnvelope
-     */
-    public function getEnvelope()
-    {
-        return $this->envelope;
     }
 
     /**
@@ -56,8 +48,10 @@ class ConsumeEvent extends AmqpEvent
      */
     public function ack()
     {
-        $this->consumed = true;
-        return $this->queue->ack($this->envelope->getDeliveryTag());
+        if (!$this->consumed) {
+            return $this->consumed = $this->queue->ack($this->getDeliveryTag());
+        }
+        return $this->consumed;
     }
 
     /**
@@ -69,10 +63,12 @@ class ConsumeEvent extends AmqpEvent
      * @param integer $flags AMQP_REQUEUE to requeue the message(s),
      * @return bool
      */
-    public function reject($flags = AMQP_NOPARAM)
+    public function reject($flags = AMQP_REQUEUE)
     {
-        $this->consumed = true;
-        return $this->queue->reject($this->envelope->getDeliveryTag(), $flags);
+        if (!$this->consumed) {
+            return $this->consumed = $this->queue->reject($this->getDeliveryTag(), $flags);
+        }
+        return $this->consumed;
     }
 
     /**
@@ -90,10 +86,12 @@ class ConsumeEvent extends AmqpEvent
      *
      * @return bool
      */
-    public function nack($flags = AMQP_NOPARAM)
+    public function nack($flags = AMQP_REQUEUE)
     {
-        $this->consumed = true;
-        return $this->queue->nack($this->envelope->getDeliveryTag(), $flags);
+        if (!$this->consumed) {
+            return $this->consumed = $this->queue->nack($this->getDeliveryTag(), $flags);
+        }
+        return $this->consumed;
     }
 
     /**
@@ -104,14 +102,5 @@ class ConsumeEvent extends AmqpEvent
     public function isConsumed()
     {
         return $this->consumed;
-    }
-
-    public function retry($expiration = 10000, $retryCount = null)
-    {
-        $this->getDispatcher()->dispatch(
-            RetryEvent::RETRY,
-            new RetryEvent($this->getEnvelope(), $this->getQueue(), $expiration, $retryCount)
-        );
-        $this->ack();
     }
 }
