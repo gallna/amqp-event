@@ -1,12 +1,11 @@
 <?php
-namespace Kemer\Amqp\Facade;
+namespace Kemer\Amqp\Addons;
 
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\EventDispatcher\Event;
-use Kemer\Amqp\Broker;
 use Kemer\Amqp;
 
-class PostponeSubscriber extends Postpone implements EventSubscriberInterface
+class DeadLetterSubscriber extends DeadLetter implements EventSubscriberInterface
 {
     /**
      * @var bool Whether no further event listeners should be triggered
@@ -19,17 +18,17 @@ class PostponeSubscriber extends Postpone implements EventSubscriberInterface
     public static function getSubscribedEvents()
     {
         return [
-            'kemer.postpone' => [
-                ['onPostpone', 1001]
+            AddonsEvent::DEAD_LETTER => [
+                ['onDeadLetter', 1001]
             ]
         ];
     }
 
     /**
-     * @param Broker $broker
+     * @param Amqp\Broker $broker
      * @param bool $stopPropagation
      */
-    public function __construct(Broker $broker, $stopPropagation = true)
+    public function __construct(Amqp\Broker $broker, $stopPropagation = true)
     {
         $this->broker = $broker;
         $this->stopPropagation = $stopPropagation;
@@ -42,12 +41,11 @@ class PostponeSubscriber extends Postpone implements EventSubscriberInterface
      * @param string $eventName
      * @return void
      */
-    public function onPostpone(Event $event, $eventName)
+    public function onDeadLetter(Event $event, $eventName)
     {
         if ($event instanceof Amqp\AmqpEvent) {
-            if ($this->postpone($event)) {
-                $event->ack();
-            }
+            $this->deadLetter($event);
+            $event->reject(null);
             if ($this->stopPropagation) {
                 $event->stopPropagation();
             }
@@ -61,7 +59,7 @@ class PostponeSubscriber extends Postpone implements EventSubscriberInterface
      * @param string $eventName
      * @return void
      */
-    public function onException(Event $event)
+    public function onException(Event $event, $eventName)
     {
         if ($event instanceof Amqp\ErrorEvent) {
             $event->getEvent()->addHeader("x-exception", [
@@ -69,8 +67,8 @@ class PostponeSubscriber extends Postpone implements EventSubscriberInterface
                 "code" => $event->getException()->getCode(),
                 "class" => get_class($event->getException()),
             ]);
-            $this->postpone($event->getEvent());
-            $event->getEvent()->ack();
+            $this->deadLetter($event->getEvent(), $event->getException());
+            $event->getEvent()->reject(null);
             if ($this->stopPropagation) {
                 $event->stopPropagation();
             }

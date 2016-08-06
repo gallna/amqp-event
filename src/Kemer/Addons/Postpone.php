@@ -1,5 +1,5 @@
 <?php
-namespace Kemer\Amqp\Facade;
+namespace Kemer\Amqp\Addons;
 
 use Kemer\Amqp;
 
@@ -63,12 +63,6 @@ class Postpone
             $event->addHeader("x-retry-count", $event->getHeader("x-retry-count", 0) + 1);
             $event->removeHeader("x-death");
             $exchange = $this->getExchange($event->getExchangeName(), $event->getRoutingKey());
-            var_dump([
-                "exchange" => $exchange->getName(),
-                "routing-key" => $event->getRoutingKey(),
-                "flags" => "AMQP_NOPARAM",
-                "attributes" => $event->attributes()
-            ]);
             $exchange->publish(
                 $event->getBody(),
                 $event->getRoutingKey(),

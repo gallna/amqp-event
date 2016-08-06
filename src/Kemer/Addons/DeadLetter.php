@@ -1,9 +1,6 @@
 <?php
-namespace Kemer\Amqp\Facade;
+namespace Kemer\Amqp\Addons;
 
-use Symfony\Component\EventDispatcher\EventSubscriberInterface;
-use Symfony\Component\EventDispatcher\Event;
-use Kemer\Amqp\Broker;
 use Kemer\Amqp;
 
 class DeadLetter
@@ -30,7 +27,7 @@ class DeadLetter
      * @param string $eventName
      * @return void
      */
-    public function deadLetter(AmqpEvent $event, \Exception $exception)
+    public function deadLetter(Amqp\AmqpEvent $event, \Exception $exception)
     {
         $queue = $this->getQueue($event->getExchangeName());
         $exchange = $this->getExchange($event->getExchangeName());

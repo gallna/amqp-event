@@ -1,11 +1,9 @@
 <?php
-namespace Kemer\Amqp\Command;
+namespace Kemer\Amqp\Addons\Command;
 
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\EventDispatcher\EventDispatcher;
-use Symfony\Component\EventDispatcher\GenericEvent;
-use Symfony\Component\EventDispatcher\Event;
-use Kemer\Amqp\Broker;
+use Kemer\Amqp\Addons\AddonsEvent;
 use Kemer\Amqp;
 
 class QueueGetCommand implements EventSubscriberInterface
@@ -21,17 +19,17 @@ class QueueGetCommand implements EventSubscriberInterface
     public static function getSubscribedEvents()
     {
         return [
-            'kemer.command.queue.get' => [
+            AddonsEvent::QUEUE_GET_COMMAND => [
                 ['onRetry', 1000]
             ],
         ];
     }
 
     /**
-     * @param Broker $broker
+     * @param Amqp\Broker $broker
      * @param bool $stopPropagation
      */
-    public function __construct(Broker $broker, $stopPropagation = true)
+    public function __construct(Amqp\Broker $broker, $stopPropagation = true)
     {
         $this->broker = $broker;
         $this->stopPropagation = $stopPropagation;
