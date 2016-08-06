@@ -2,6 +2,7 @@
 include __DIR__.'./../vendor/autoload.php';
 
 use Kemer\Amqp;
+use Kemer\Amqp\Addons as AmqpAddons;
 use Symfony\Component\EventDispatcher\GenericEvent;
 
 $broker = new Amqp\Broker(
@@ -9,9 +10,10 @@ $broker = new Amqp\Broker(
 );
 
 $dispatcher = new Amqp\Dispatcher();
-$dispatcher->addSubscriber(new Amqp\Facade\PostponeSubscriber($broker));
-$dispatcher->addSubscriber(new Amqp\Facade\DeadLetterSubscriber($broker));
-$dispatcher->addSubscriber(new Amqp\Command\QueueGetCommand($broker));
+$dispatcher->addSubscriber(new AmqpAddons\PostponeSubscriber($broker));
+$dispatcher->addSubscriber(new AmqpAddons\DeadLetterSubscriber($broker));
+
+$dispatcher->addSubscriber(new AmqpAddons\Command\QueueGetCommand($broker));
 
 // Add event listeners
 $dispatcher->addListener('kernel.message', [new App\Listener(), "onMessage"]);
@@ -85,7 +87,7 @@ $dispatcher->addListener('kemer.error', function (GenericEvent $event, $eventNam
  */
 $dispatcher->addListener('kemer.error', function (GenericEvent $event, $eventName, $dispatcher) {
     if ($event["error"] instanceof \RuntimeException) {
-        $dispatcher->dispatch(Amqp\AmqpEvent::POSTPONE, $event->getSubject());
+        $dispatcher->dispatch(AmqpAddons\AddonsEvent::POSTPONE, $event->getSubject());
     }
 }, -1);
 
