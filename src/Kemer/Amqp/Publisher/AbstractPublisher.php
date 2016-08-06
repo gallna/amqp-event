@@ -3,7 +3,6 @@ namespace Kemer\Amqp\Publisher;
 
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\EventDispatcher\Event;
-use Kemer\Amqp\Broker;
 use Kemer\Amqp;
 
 abstract class AbstractPublisher
@@ -19,11 +18,11 @@ abstract class AbstractPublisher
     private $stopPropagation = true;
 
     /**
-     * @param Broker $broker
+     * @param Amqp\Broker $broker
      * @param AMQPExchange $defaultExchange
      * @param bool $stopPropagation
      */
-    public function __construct(Broker $broker, $stopPropagation = true)
+    public function __construct(Amqp\Broker $broker, $stopPropagation = true)
     {
         $this->broker = $broker;
         $this->stopPropagation = $stopPropagation;

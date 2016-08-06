@@ -1,9 +1,7 @@
 <?php
 namespace Kemer\Amqp\Publisher;
 
-use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\EventDispatcher\Event;
-use Kemer\Amqp\Broker;
 use Kemer\Amqp;
 
 class DefaultExchangePublisher extends AbstractPublisher
@@ -14,9 +12,8 @@ class DefaultExchangePublisher extends AbstractPublisher
     protected $defaultExchange;
 
     /**
-     * @param Broker $broker
      * @param AMQPExchange $defaultExchange
-     * @param bool $stopPropagation
+     * @param array $arguments
      */
     public function __construct(\AMQPExchange $defaultExchange, ...$arguments)
     {

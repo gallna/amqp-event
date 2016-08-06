@@ -5,6 +5,8 @@ use Symfony\Component\EventDispatcher\GenericEvent as SymfonyEvent;
 
 class Consumer
 {
+    const ERROR_EVENT = 'kemer.error';
+
     /**
      * @var DispatcherInterface
      */
@@ -104,12 +106,11 @@ class Consumer
     public function __invoke(\AMQPEnvelope $envelope, \AMQPQueue $queue)
     {
         $event = new ConsumeEvent($envelope, $queue);
-        //return $event->reject(false);
         try {
             $this->dispatcher->dispatch($event->getRoutingKey(), $event);
         } catch (\Exception $e) {
             $this->dispatcher
-                ->dispatch("kemer.error", new SymfonyEvent($event, ["error" => $e]));
+                ->dispatch(static::ERROR_EVENT, new SymfonyEvent($event, ["error" => $e]));
             if (!$event->isConsumed()) {
                 throw new Exceptions\ConsumerException($event, $e);
             }

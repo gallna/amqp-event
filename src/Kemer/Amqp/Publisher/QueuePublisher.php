@@ -1,9 +1,7 @@
 <?php
 namespace Kemer\Amqp\Publisher;
 
-use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\EventDispatcher\Event;
-use Kemer\Amqp\Broker;
 use Kemer\Amqp;
 
 class QueuePublisher extends AbstractPublisher

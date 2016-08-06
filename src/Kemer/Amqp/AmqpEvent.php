@@ -27,10 +27,6 @@ class AmqpEvent extends SymfonyEvent
 {
     use BasicPropertiesTrait;
 
-    const DEAD_LETTER_RETRY = 'kemer.dead-letter.retry';
-    const DEAD_LETTER = 'kemer.dead-letter';
-    const POSTPONE = 'kemer.postpone';
-
     /**
      * @param string $body
      * @param string $contentType

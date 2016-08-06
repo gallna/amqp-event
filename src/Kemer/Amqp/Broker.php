@@ -86,7 +86,7 @@ class Broker
      *
      * @return object
      */
-    public function channel($reuse = true)
+    public function channel($reuse = false)
     {
         if (!$this->channel || !$reuse) {
             $this->channel = new \AMQPChannel($this->connection());
