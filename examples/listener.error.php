@@ -6,19 +6,21 @@ use Kemer\Amqp\Addons as AmqpAddons;
 use Symfony\Component\EventDispatcher\GenericEvent;
 
 $broker = new Amqp\Broker(
-    "rabbit.docker", 5672, 'guest', 'guest'
+    getenv("AMQP_HOST") ?: "rabbit.docker",
+    getenv("AMQP_PORT") ?: 5672,
+    getenv("AMQP_LOGIN") ?: 'guest',
+    getenv("AMQP_PASSWORD") ?: 'guest'
 );
 
 $dispatcher = new Amqp\Dispatcher();
 $dispatcher->addSubscriber(new AmqpAddons\PostponeSubscriber($broker));
 $dispatcher->addSubscriber(new AmqpAddons\DeadLetterSubscriber($broker));
 
-$dispatcher->addSubscriber(new AmqpAddons\Command\QueueGetCommand($broker));
 
 // Add event listeners
-$dispatcher->addListener('kernel.message', [new App\Listener(), "onMessage"]);
-// $dispatcher->addListener("kernel.*", [new App\Listener(), "onKernel"]);
-// $dispatcher->addListener('#', [new App\Listener(), "onAll"]);
+$dispatcher->addListener('kernel.waits', [new App\Listener(), "onMessage"]);
+$dispatcher->addListener("kernel.*", [new App\Listener(), "onKernel"]);
+$dispatcher->addListener('#', [new App\Listener(), "onAll"]);
 
 
 // Add event subscriber
@@ -69,19 +71,20 @@ $exchange = $broker->declareExchange(AMQP_DURABLE, "some-exchange", AMQP_EX_TYPE
 
 /**
  * Error handling
- * You can register listener to `kemer.error` event to handle exceptions. See examples:
+ * You can register listener to `kemer.error` event to handle exceptions.
+ * Add Monolog to log everything
  */
-$dispatcher->addListener('kemer.error', function (GenericEvent $event, $eventName, $dispatcher) {
-    printf(
-        "Error (%s)'%s' | %s@%s | %s \n",
-        $event["error"]->getCode(),
-        $event["error"]->getMessage(),
-        $event->getSubject()->getExchangeName(),
-        $event->getSubject()->getRoutingKey(),
-        $event->getSubject()->isRedelivery() ? "redelivery" : "new"
-    );
-});
-
+$dispatcher->addSubscriber(new AmqpAddons\MonologSubscriber(
+    $logger = new Monolog\Logger("AMQP")
+));
+$logger->pushHandler($handler = new Monolog\Handler\ErrorLogHandler());
+$handler->setFormatter(new Monolog\Formatter\LineFormatter(
+    $output = "\033[31m %level_name%\033[32m %message%\033[36m %context% \033[0m",
+    $dateFormat = "g:i".
+    false,
+    false
+));
+$dispatcher->addSubscriber(new AmqpAddons\Command\QueueGetCommand($broker, $logger));
 /**
  * postpone message on RuntimeException
  */
@@ -112,6 +115,11 @@ try {
         $event->reject($event->isRedelivery() ? false : AMQP_REQUEUE);
     }
 } catch (Amqp\Exceptions\NotConsumedException $e) {
-    printf("%s@%s NOT FOUND \n", $e->getEvent()->getExchangeName(), $e->getEvent()->getRoutingKey());
+    $logger->info(
+        sprintf("%s@%s NOT FOUND \n",
+            $e->getEvent()->getExchangeName(),
+            $e->getEvent()->getRoutingKey()
+        )
+    );
     $e->getEvent()->reject(false);
 }

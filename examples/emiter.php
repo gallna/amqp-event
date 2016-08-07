@@ -13,7 +13,16 @@ $dispatcher = new Amqp\Dispatcher();
 $dispatcher->addListener("#", new Amqp\Publisher\QueuePublisher($broker), 1000);
 $dispatcher->addListener("#", new Amqp\Publisher\ExchangePublisher($broker), 1001);
 
-
+$dispatcher->addSubscriber(new AmqpAddons\MonologSubscriber(
+    $logger = new Monolog\Logger("AMQP")
+));
+$logger->pushHandler($handler = new Monolog\Handler\ErrorLogHandler());
+$handler->setFormatter(new Monolog\Formatter\LineFormatter(
+    $output = "\033[31m %level_name%\033[32m %message%\033[36m %context% \033[0m",
+    $dateFormat = "g:i".
+    false,
+    false
+));
 
 $emiter = new App\Emiter($dispatcher);
 

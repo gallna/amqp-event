@@ -20,12 +20,13 @@ class Subscriber implements EventSubscriberInterface
             'kernel.notice' => 'onKernelNotice',
             'kernel.info' => 'onKernelInfo',
             'kernel.wait' => 'onKernelWait',
+            'kernel.die' => 'onKernelDie',
         ];
     }
 
     private function display(AmqpEvent $event, $eventName, $methodName, $color = "1;32")
     {
-        echo sprintf(
+        sprintf(
             "\033[%sm %s@%s\033[0m\033[36m [%s]\033[0m %s: %s \n",
             $color,
             $event->getExchangeName(),
@@ -45,7 +46,6 @@ class Subscriber implements EventSubscriberInterface
     public function onKernelError(AmqpEvent $event, $eventName, EventDispatcher $dispatcher)
     {
         $this->display($event, $eventName, __METHOD__);
-        throw new \LogicException("Dead-letter exception");
         $event->ack();
     }
 
@@ -67,9 +67,17 @@ class Subscriber implements EventSubscriberInterface
         $event->ack();
     }
 
+    public function onKernelDie(AmqpEvent $event, $eventName, EventDispatcher $dispatcher)
+    {
+        $this->display($event, $eventName, __METHOD__, 31);
+        throw new \LogicException("Die on LogicException test");
+        $event->ack();
+    }
+
     public function onKernelWait(AmqpEvent $event, $eventName, EventDispatcher $dispatcher)
     {
         $this->display($event, $eventName, __METHOD__, 31);
+        throw new \RuntimeException("Postpone on RuntimeException test");
         $event->ack();
     }
 }

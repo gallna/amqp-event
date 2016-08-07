@@ -32,9 +32,19 @@ class Emiter
     {
         // Publish queue-get command
         $headers = ["x-command-queue-get" => ["flags" => $queueFlags, "name" => $queueName]];
-        $event = new Amqp\PublishEvent("queue-get");
-        $event->setExchangeName($exchangeName)->setHeaders($headers);
-        $this->dispatcher->dispatch(AmqpAddons\AddonsEvent::QUEUE_GET_COMMAND, $event);
+        $this->dispatcher->dispatch(
+            AmqpAddons\AddonsEvent::QUEUE_GET_COMMAND,
+            (new Amqp\PublishEvent("queue-get"))
+                ->setExchangeName($exchangeName)->setHeaders($headers)
+        );
+    }
+
+    public function messagePostpone($exchangeName)
+    {
+        $this->dispatcher->dispatch(
+            "kernel.wait",
+            (new Amqp\PublishEvent("wait"))->setExchangeName($exchangeName)
+        );
     }
 
     public function publishToQueue()
@@ -52,25 +62,15 @@ class Emiter
             (new Amqp\PublishEvent("error"))->setExchangeName($exchangeName)
         );
         $this->dispatcher->dispatch(
-            "kernel.wait",
-            (new Amqp\PublishEvent("wait"))->setExchangeName($exchangeName)
-        );
-        $this->dispatcher->dispatch(
-            "kernel.critical",
-            (new Amqp\PublishEvent("critical"))->setExchangeName($exchangeName)
-        );
-        $this->dispatcher->dispatch(
-            "kernel.error",
-            (new Amqp\PublishEvent("error"))->setExchangeName($exchangeName)
+            "kernel.warning",
+            (new Amqp\PublishEvent("warning"))->setExchangeName($exchangeName)
         );
     }
 
     public function publishToDefaultExchange()
     {
-        $this->dispatcher->dispatch("kernel.error", (new Amqp\PublishEvent("error")));
-        $this->dispatcher->dispatch("kernel.warning", (new Amqp\PublishEvent("warning")));
+        $this->dispatcher->dispatch("kernel.info", (new Amqp\PublishEvent("info")));
         $this->dispatcher->dispatch("kernel.notice", (new Amqp\PublishEvent("notice")));
-        $this->dispatcher->dispatch("kernel.waits", (new Amqp\PublishEvent("wait")));
     }
 
     public function publishErroring()

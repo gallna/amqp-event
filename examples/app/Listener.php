@@ -2,36 +2,33 @@
 namespace App;
 
 use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\EventDispatcher\Event;
 use Kemer\Amqp\AmqpEvent;
 
 class Listener
 {
-    private function display(AmqpEvent $event, $eventName, $methodName, $color = "32")
+    private function display(Event $event, $eventName, $methodName, $color = "32")
     {
-        echo sprintf(
-            "\033[%sm %s@%s\033[0m\033[36m [%s]\033[0m %s: %s \n",
+        sprintf(
+            "\033[%sm %s@%s\033[0m\033[36m \033[0m %s \n",
             $color,
-            $event->getExchangeName(),
-            $event->getRoutingKey(),
+            get_class($event),
             $eventName,
-            $methodName,
-            $event->getBody()
+            $methodName
         );
     }
 
     public function onKernel(AmqpEvent $event, $eventName, EventDispatcher $dispatcher)
     {
         $this->display($event, $eventName, __METHOD__);
-        $event->ack();
     }
 
-    public function onAll(AmqpEvent $event, $eventName, EventDispatcher $dispatcher)
+    public function onAll(Event $event, $eventName, EventDispatcher $dispatcher)
     {
         $this->display($event, $eventName, __METHOD__);
-        $event->ack();
     }
 
-    public function onMessage(AmqpEvent $event, $eventName, EventDispatcher $dispatcher)
+    public function onMessage(Event $event, $eventName, EventDispatcher $dispatcher)
     {
         $this->display($event, $eventName, __METHOD__, 34);
         $event->ack();
