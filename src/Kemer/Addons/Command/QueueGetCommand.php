@@ -3,11 +3,17 @@ namespace Kemer\Amqp\Addons\Command;
 
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\EventDispatcher\EventDispatcher;
+use Monolog\Logger;
 use Kemer\Amqp\Addons\AddonsEvent;
 use Kemer\Amqp;
 
 class QueueGetCommand implements EventSubscriberInterface
 {
+    /**
+     * @var Monolog\Logger
+     */
+    private $logger;
+
     /**
      * @var bool Whether no further event listeners should be triggered
      */
@@ -27,11 +33,13 @@ class QueueGetCommand implements EventSubscriberInterface
 
     /**
      * @param Amqp\Broker $broker
+     * @param Logger $logger
      * @param bool $stopPropagation
      */
-    public function __construct(Amqp\Broker $broker, $stopPropagation = true)
+    public function __construct(Amqp\Broker $broker, Logger $logger = null, $stopPropagation = true)
     {
         $this->broker = $broker;
+        $this->logger = $logger;
         $this->stopPropagation = $stopPropagation;
     }
 
@@ -46,18 +54,25 @@ class QueueGetCommand implements EventSubscriberInterface
     public function onRetry(Amqp\AmqpEvent $event, $eventName, EventDispatcher $dispatcher)
     {
         if ($ev = $this->getQueueEvent($event)) {
+            $this->log("INFO", "", $ev);
             try {
                 $dispatcher->dispatch($ev->getRoutingKey(), $ev);
                 if ($ev->isConsumed()) {
-                    printf("%s@%s OK \n", $ev->getExchangeName(), $ev->getRoutingKey());
                     $ev->ack();
                 }
             } catch (\Exception $e) {
-                printf("%s@%s FAILED \n", $ev->getExchangeName(), $ev->getRoutingKey());
+                $this->log(
+                    "ERROR", "FAILED", $ev,
+                    [
+                        "message" => $e->getMessage(),
+                        "code" => $e->getCode(),
+                        "class" => get_class($e)
+                    ]
+                );
                 $ev->reject();
             }
             if (!$ev->isConsumed()) {
-                printf("%s@%s NOT CONSUMED \n", $ev->getExchangeName(), $ev->getRoutingKey());
+                $this->log("ERROR", "NOT CONSUMED", $ev);
                 $ev->reject();
             }
             if ($this->stopPropagation) {
@@ -65,7 +80,7 @@ class QueueGetCommand implements EventSubscriberInterface
             }
             $event->ack();
         } else {
-            printf("INVALID %s@%s \n", $ev->getExchangeName(), $ev->getRoutingKey());
+            $this->log("NOTICE", "INVALID", $event);
         }
     }
 
@@ -81,6 +96,27 @@ class QueueGetCommand implements EventSubscriberInterface
             $queue = $this->broker->queue($flags, $name);
             $envelope = $queue->get();
             return $envelope ? new Amqp\ConsumeEvent($envelope, $queue) : null;
+        }
+    }
+
+    /**
+     * On dispatch event listener - called on any event
+     *
+     * @param Event $event
+     * @param string $eventName
+     * @return void
+     */
+    private function log($level, $message, $ev, array $context = [])
+    {
+        if ($this->logger) {
+            $message = sprintf(
+                "QueueGet \033[1;36m%s@%s\033[0m %s",
+                $ev->getRoutingKey(),
+                $ev->getExchangeName(),
+                $message
+            );
+            $context["command"] = AddonsEvent::QUEUE_GET_COMMAND;
+            $this->logger->log($level, $message, $context);
         }
     }
 }
