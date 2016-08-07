@@ -6,6 +6,7 @@ use Symfony\Component\EventDispatcher\GenericEvent as SymfonyEvent;
 class Consumer
 {
     const ERROR_EVENT = 'kemer.error';
+    const BIND_EVENT = 'kemer.bind';
 
     /**
      * @var DispatcherInterface
@@ -85,6 +86,10 @@ class Consumer
         foreach ($events as $eventName) {
             $queue->bind($exchange->getName(), $eventName);
         }
+        $this->dispatcher->dispatch(
+            static::BIND_EVENT,
+            new SymfonyEvent($events, ["pattern" => $this->pattern, "exchange" => $exchange->getName(), "queue" => $queue->getName()])
+        );
     }
 
     /**

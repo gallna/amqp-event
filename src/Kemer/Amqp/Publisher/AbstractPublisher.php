@@ -56,8 +56,6 @@ abstract class AbstractPublisher
             $event->getFlags(),
             $event->jsonSerialize()
         );
-        printf("%s: Publishing '%s' to exchange '%s' %s\n", get_class($this), $eventName, $exchange->getName(), $success ? "OK" : "FAIL");
-
         if ($this->stopPropagation) {
             $event->stopPropagation();
         }
