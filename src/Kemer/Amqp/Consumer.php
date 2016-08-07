@@ -22,11 +22,20 @@ class Consumer
     private $consumerTag;
 
     /**
-     * @param DispatcherInterface $dispatcher
+     * Pattern to exclude when bind queue to an exchange
+     *
+     * @var string
      */
-    public function __construct(Dispatcher $dispatcher)
+    private $pattern;
+
+    /**
+     * @param DispatcherInterface $dispatcher
+     * @param string $pattern
+     */
+    public function __construct(Dispatcher $dispatcher, $pattern = null)
     {
         $this->dispatcher = $dispatcher;
+        $this->pattern = $pattern ?: "/^kemer\\..+/";
     }
 
     /**
@@ -68,7 +77,11 @@ class Consumer
      */
     public function bind(\AMQPQueue $queue, \AMQPExchange $exchange)
     {
-        $events = array_keys($this->getDispatcher()->getListeners());
+        $events = preg_grep(
+            $this->pattern,
+            array_keys($this->getDispatcher()->getListeners()),
+            PREG_GREP_INVERT
+        );
         foreach ($events as $eventName) {
             $queue->bind($exchange->getName(), $eventName);
         }
