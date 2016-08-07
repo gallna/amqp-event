@@ -36,7 +36,7 @@ class Consumer
     public function __construct(Dispatcher $dispatcher, $pattern = null)
     {
         $this->dispatcher = $dispatcher;
-        $this->pattern = $pattern ?: "/^kemer\\..+/";
+        $this->pattern = $pattern ?: "/^\\b(?!kemer\\.).+\\b.*$/";
     }
 
     /**
@@ -80,8 +80,7 @@ class Consumer
     {
         $events = preg_grep(
             $this->pattern,
-            array_keys($this->getDispatcher()->getListeners()),
-            PREG_GREP_INVERT
+            array_keys($this->getDispatcher()->getListeners())
         );
         foreach ($events as $eventName) {
             $queue->bind($exchange->getName(), $eventName);
