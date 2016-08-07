@@ -9,6 +9,9 @@
     "require-dev": {
         "monolog/monolog": "~1.2"
     },
+    "suggest": {
+        "monolog/monolog": "Allow sending log messages to a cli console"
+    },
     "authors": [
         {
             "name": "Tomasz Jonik",
